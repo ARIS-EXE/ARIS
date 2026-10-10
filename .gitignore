@@ -1,0 +1,33 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# User data
+rc_inventory.db
+*.db
+*.sqlite
+*.sqlite3
+product_images/
+backups/
+backup_settings.json
+
+# Local application data and temporary checks
+check_database.py
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
