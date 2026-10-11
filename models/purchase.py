@@ -149,6 +149,33 @@ def get_purchase_items(purchase_id):
         return cursor.fetchall()
     finally:
         connection.close()
+def get_unlinked_instances():
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute("""
+            SELECT
+                instances.id,
+                instances.internal_number,
+                products.manufacturer,
+                products.part_number,
+                products.name
+            FROM instances
+            JOIN products
+                ON products.id = instances.product_id
+            WHERE instances.deleted = 0
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM purchase_items
+                    WHERE purchase_items.instance_id = instances.id
+                )
+            ORDER BY instances.internal_number
+        """)
+
+        return cursor.fetchall()
+
+    finally:
+        connection.close()
 def distribute_amount(
     total_amount,
     count
@@ -319,28 +346,30 @@ def create_purchase(
 
     finally:
         connection.close()
+
 def create_purchase_multi(
     items,
     total_purchase_price,
     total_shipping,
     purchase_date,
-    condition="new"
+    condition="new",
+    existing_instance_ids=None
 ):
-    if not items:
+    existing_instance_ids = existing_instance_ids or []
+
+    if not items and not existing_instance_ids:
         raise ValueError(
-            "Добавьте хотя бы один товар."
+            "Добавьте хотя бы один товар или экземпляр."
         )
 
-    total_count = 0
+    total_count = len(existing_instance_ids)
 
     for item in items:
         product_id = item.get("product_id")
         count = item.get("count")
 
         if product_id is None:
-            raise ValueError(
-                "Не указан товар."
-            )
+            raise ValueError("Не указан товар.")
 
         if count is None or count <= 0:
             raise ValueError(
@@ -349,6 +378,11 @@ def create_purchase_multi(
 
         total_count += count
 
+    if len(set(existing_instance_ids)) != len(existing_instance_ids):
+        raise ValueError(
+            "Один экземпляр нельзя добавить в закупку повторно."
+        )
+
     if total_count <= 0:
         raise ValueError(
             "Количество экземпляров должно быть больше нуля."
@@ -356,6 +390,11 @@ def create_purchase_multi(
 
     purchase_prices = distribute_amount(
         total_purchase_price,
+        total_count
+    )
+
+    purchase_shippings = distribute_amount(
+        total_shipping,
         total_count
     )
 
@@ -495,6 +534,92 @@ def create_purchase_multi(
                     )
                 )
                 price_index += 1
+
+        for instance_id in existing_instance_ids:
+            cursor.execute(
+                """
+                SELECT product_id
+                FROM instances
+                WHERE id = ?
+                  AND deleted = 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM purchase_items
+                      WHERE purchase_items.instance_id = instances.id
+                  )
+                """,
+                (instance_id,)
+            )
+
+            result = cursor.fetchone()
+
+            if result is None:
+                raise ValueError(
+                    f"Экземпляр ID {instance_id} уже включён "
+                    "в закупку или недоступен."
+                )
+
+            product_id = result[0]
+            purchase_price = purchase_prices[price_index]
+            purchase_shipping = purchase_shippings[price_index]
+
+            cursor.execute(
+                """
+                UPDATE instances
+                SET purchase_price = ?,
+                    purchase_shipping = ?,
+                    purchase_date = ?
+                WHERE id = ?
+                """,
+                (
+                    purchase_price,
+                    purchase_shipping,
+                    purchase_date,
+                    instance_id
+                )
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO purchase_items (
+                    purchase_id,
+                    instance_id,
+                    allocated_purchase_price,
+                    allocated_shipping
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    purchase_id,
+                    instance_id,
+                    purchase_price,
+                    purchase_shipping
+                )
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO events (
+                    event_date,
+                    event_type,
+                    instance_id,
+                    product_id,
+                    purchase_id,
+                    amount
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    purchase_date,
+                    "purchase",
+                    instance_id,
+                    product_id,
+                    purchase_id,
+                    purchase_price + purchase_shipping
+                )
+            )
+
+            price_index += 1
 
         connection.commit()
 

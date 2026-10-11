@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QMenu,
+    QDialog
 )
 from pathlib import Path
 from PySide6.QtGui import QPixmap
@@ -22,7 +23,10 @@ from PySide6.QtGui import QPixmap
 from app_paths import IMAGE_DIR
 from PySide6.QtCore import QDate, Qt
 from database.database import get_connection
-from models.purchase import create_purchase_multi
+from models.purchase import (
+    create_purchase_multi,
+    get_unlinked_instances,
+)
 
 class PurchaseCard(QWidget):
 
@@ -188,7 +192,7 @@ class PurchaseCard(QWidget):
         # ------------------------------------------------------------
 
         add_layout = QHBoxLayout()
-
+        add_layout.setAlignment(Qt.AlignTop)
         self.new_product_button = QPushButton(
             "+ Новый товар"
         )
@@ -202,11 +206,13 @@ class PurchaseCard(QWidget):
         )
 
         add_layout.addWidget(
-            self.new_product_button
+            self.new_product_button,
+            alignment=Qt.AlignTop
         )
 
         add_layout.addWidget(
-            QLabel("Количество:")
+            QLabel("Количество:"),
+            alignment=Qt.AlignTop
         )
 
         self.count = QSpinBox()
@@ -216,8 +222,12 @@ class PurchaseCard(QWidget):
         )
 
         add_layout.addWidget(
-            self.count
+            self.count,
+            alignment=Qt.AlignTop
         )
+
+        # Вертикальный блок кнопок добавления
+        buttons_layout = QVBoxLayout()
 
         self.add_button = QPushButton(
             "Добавить товар"
@@ -227,8 +237,24 @@ class PurchaseCard(QWidget):
             self.add_product
         )
 
-        add_layout.addWidget(
+        self.add_existing_instance_button = QPushButton(
+            "Добавить существующий экземпляр"
+        )
+
+        self.add_existing_instance_button.clicked.connect(
+            self.add_existing_instance
+        )
+
+        buttons_layout.addWidget(
             self.add_button
+        )
+
+        buttons_layout.addWidget(
+            self.add_existing_instance_button
+        )
+
+        add_layout.addLayout(
+            buttons_layout
         )
 
         left_area.addLayout(
@@ -248,7 +274,8 @@ class PurchaseCard(QWidget):
         )
 
         add_layout.addWidget(
-            self.save_button
+            self.save_button,
+            alignment=Qt.AlignTop
         )
 
         main_area.addLayout(
@@ -536,6 +563,109 @@ class PurchaseCard(QWidget):
             1,
             count_item
         )
+    def add_existing_instance(self):
+        instances = get_unlinked_instances()
+
+        if not instances:
+            QMessageBox.information(
+                self,
+                "Нет экземпляров",
+                "Нет экземпляров, не включённых в другие закупки."
+            )
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выбрать существующий экземпляр")
+        dialog.resize(600, 400)
+
+        dialog_layout = QVBoxLayout(dialog)
+
+        instance_list = QListWidget(dialog)
+
+        for instance in instances:
+            (
+                instance_id,
+                internal_number,
+                manufacturer,
+                part_number,
+                name,
+            ) = instance
+
+            product_name = " ".join(
+                str(value)
+                for value in (
+                    manufacturer,
+                    part_number,
+                    name,
+                )
+                if value
+            )
+
+            item = QListWidgetItem(
+                f"№ {internal_number} — {product_name}"
+            )
+
+            item.setData(Qt.UserRole, instance_id)
+            instance_list.addItem(item)
+
+        dialog_layout.addWidget(instance_list)
+
+        buttons_layout = QHBoxLayout()
+
+        select_button = QPushButton("Выбрать")
+        cancel_button = QPushButton("Отмена")
+
+        buttons_layout.addWidget(select_button)
+        buttons_layout.addWidget(cancel_button)
+
+        dialog_layout.addLayout(buttons_layout)
+
+        select_button.clicked.connect(dialog.accept)
+        cancel_button.clicked.connect(dialog.reject)
+        instance_list.itemDoubleClicked.connect(
+            lambda item: dialog.accept()
+        )
+
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        selected_item = instance_list.currentItem()
+
+        if selected_item is None:
+            QMessageBox.warning(
+                self,
+                "Выбор не сделан",
+                "Выберите экземпляр из списка."
+            )
+            return
+
+        instance_id = selected_item.data(Qt.UserRole)
+
+        for row in range(self.items_table.rowCount()):
+            product_item = self.items_table.item(row, 0)
+
+            if (
+                product_item is not None
+                and product_item.data(Qt.UserRole + 1) == instance_id
+            ):
+                QMessageBox.information(
+                    self,
+                    "Уже добавлен",
+                    "Этот экземпляр уже добавлен в закупку."
+                )
+                return
+
+        row = self.items_table.rowCount()
+        self.items_table.insertRow(row)
+
+        product_item = QTableWidgetItem(selected_item.text())
+        product_item.setData(Qt.UserRole + 1, instance_id)
+        product_item.setData(Qt.UserRole, None)
+
+        count_item = QTableWidgetItem("1")
+
+        self.items_table.setItem(row, 0, product_item)
+        self.items_table.setItem(row, 1, count_item)
     def remove_product(self):
         row = self.items_table.currentRow()
 
@@ -550,6 +680,7 @@ class PurchaseCard(QWidget):
         self.items_table.removeRow(
             row
         )
+
     def show_context_menu(self, position):
         item = self.items_table.itemAt(position)
 
@@ -558,33 +689,68 @@ class PurchaseCard(QWidget):
 
         row = item.row()
 
-        product_item = self.items_table.item(
-            row,
-            0
-        )
+        product_item = self.items_table.item(row, 0)
 
         if product_item is None:
             return
 
-        product_id = product_item.data(
-            1000
+        existing_instance_id = product_item.data(
+            Qt.UserRole + 1
         )
+
+        product_id = product_item.data(1000)
+        listed_date = None
+
+        # Для существующего экземпляра получаем данные из БД
+        if existing_instance_id is not None:
+            connection = get_connection()
+
+            try:
+                result = connection.execute(
+                    """
+                    SELECT product_id, listed_date
+                    FROM instances
+                    WHERE id = ?
+                      AND deleted = 0
+                    """,
+                    (existing_instance_id,)
+                ).fetchone()
+
+                if result is None:
+                    QMessageBox.warning(
+                        self,
+                        "Ошибка",
+                        "Экземпляр не найден или удалён."
+                    )
+                    return
+
+                product_id, listed_date = result
+
+            finally:
+                connection.close()
 
         if not product_id:
             return
 
         menu = QMenu(self)
 
-        open_action = menu.addAction(
+        open_product_action = menu.addAction(
             "Открыть карточку товара"
         )
 
-        delete_action = None
+        open_instance_action = None
+
+        if existing_instance_id is not None:
+            open_instance_action = menu.addAction(
+                "Открыть карточку экземпляра"
+            )
+
+        delete_row_action = None
 
         if not self.purchase_saved:
             menu.addSeparator()
 
-            delete_action = menu.addAction(
+            delete_row_action = menu.addAction(
                 "Удалить строку из документа"
             )
 
@@ -592,14 +758,20 @@ class PurchaseCard(QWidget):
             self.items_table.mapToGlobal(position)
         )
 
-        if action == open_action:
-            self.main_window.open_product_card(
-                product_id
+        if action == open_product_action:
+            self.main_window.open_product_card(product_id)
+
+        elif (
+            open_instance_action is not None
+            and action == open_instance_action
+        ):
+            self.main_window.open_instance_card(
+                existing_instance_id
             )
 
         elif (
-            delete_action is not None
-            and action == delete_action
+            delete_row_action is not None
+            and action == delete_row_action
         ):
             self.items_table.removeRow(row)
 
@@ -726,53 +898,71 @@ class PurchaseCard(QWidget):
         self.purchase_date.setEnabled(False)
         self.total_purchase_price.setEnabled(False)
         self.total_shipping.setEnabled(False)
+
     def save_purchase(self):
         items = []
+        existing_instance_ids = []
 
-        for row in range(
-            self.items_table.rowCount()
-        ):
-            product_item = self.items_table.item(
-                row,
-                0
-            )
-
-            count_item = self.items_table.item(
-                row,
-                1
-            )
+        for row in range(self.items_table.rowCount()):
+            product_item = self.items_table.item(row, 0)
+            count_item = self.items_table.item(row, 1)
 
             if product_item is None or count_item is None:
                 continue
 
-            product_id = product_item.data(
-                1000
+            existing_instance_id = product_item.data(
+                Qt.UserRole + 1
             )
 
-            count = int(
-                count_item.text()
-            )
+            if existing_instance_id is not None:
+                existing_instance_ids.append(
+                    existing_instance_id
+                )
+                continue
+
+            product_id = product_item.data(1000)
+
+            if product_id is None:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    f"Не удалось определить товар в строке {row + 1}."
+                )
+                return
+
+            try:
+                count = int(count_item.text())
+            except ValueError:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    f"Некорректное количество в строке {row + 1}."
+                )
+                return
+
+            if count <= 0:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Количество должно быть больше нуля."
+                )
+                return
 
             items.append({
                 "product_id": product_id,
                 "count": count
             })
 
-        if not items:
+        if not items and not existing_instance_ids:
             QMessageBox.warning(
                 self,
                 "Ошибка",
-                "Добавьте хотя бы один товар."
+                "Добавьте хотя бы один товар или экземпляр."
             )
             return
 
-        total_purchase_price = (
-            self.total_purchase_price.value()
-        )
-
-        total_shipping = (
-            self.total_shipping.value()
-        )
+        total_purchase_price = self.total_purchase_price.value()
+        total_shipping = self.total_shipping.value()
 
         purchase_date = (
             self.purchase_date.date()
@@ -780,17 +970,12 @@ class PurchaseCard(QWidget):
         )
 
         try:
-            purchase_id, purchase_number = (
-                create_purchase_multi(
-                    items=items,
-                    total_purchase_price=(
-                        total_purchase_price
-                    ),
-                    total_shipping=(
-                        total_shipping
-                    ),
-                    purchase_date=purchase_date
-                )
+            purchase_id, purchase_number = create_purchase_multi(
+                items=items,
+                total_purchase_price=total_purchase_price,
+                total_shipping=total_shipping,
+                purchase_date=purchase_date,
+                existing_instance_ids=existing_instance_ids
             )
 
         except Exception as error:
@@ -814,37 +999,18 @@ class PurchaseCard(QWidget):
 
         self.product_image_pixmap = QPixmap()
         self.product_image.clear()
-        self.product_image.setText(
-            "Фото товара"
-        )
+        self.product_image.setText("Фото товара")
 
-        self.product_search.setEnabled(
-            False
-        )
+        self.product_search.setEnabled(False)
+        self.product_list.setEnabled(False)
+        self.count.setEnabled(False)
+        self.add_button.setEnabled(False)
+        self.add_existing_instance_button.setEnabled(False)
+        self.save_button.setEnabled(False)
+        self.purchase_date.setEnabled(False)
+        self.total_purchase_price.setEnabled(False)
+        self.total_shipping.setEnabled(False)
 
-        self.count.setEnabled(
-            False
-        )
-
-        self.add_button.setEnabled(
-            False
-        )
-
-        self.save_button.setEnabled(
-            False
-        )
-
-        self.purchase_date.setEnabled(
-            False
-        )
-
-        self.total_purchase_price.setEnabled(
-            False
-        )
-
-        self.total_shipping.setEnabled(
-            False
-        )
     def show_product_list_context_menu(self, position):
         item = self.product_list.itemAt(position)
 
