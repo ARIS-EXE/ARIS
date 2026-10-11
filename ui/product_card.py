@@ -1149,6 +1149,7 @@ class ProductCard(QWidget):
             )
         self.update_delete_button()
 
+
     def show_instance_context_menu(self, position):
         item = self.instances_list.itemAt(position)
 
@@ -1161,41 +1162,22 @@ class ProductCard(QWidget):
 
         menu = QMenu(self)
 
-        if status == "in_stock":
+        purchase_action = None
+        sale_action = None
+
+        if status in ("in_stock", "sold", "written_off"):
             purchase_action = menu.addAction(
                 "Открыть документ закупки"
             )
 
-            open_action = menu.addAction(
-                "Открыть карточку экземпляра"
-            )
-
-        elif status == "sold":
-            purchase_action = menu.addAction(
-                "Открыть документ закупки"
-            )
-
+        if status == "sold":
             sale_action = menu.addAction(
                 "Открыть документ продажи"
             )
 
-            open_action = menu.addAction(
-                "Открыть карточку экземпляра"
-            )
-
-        elif status == "written_off":
-            purchase_action = menu.addAction(
-                "Открыть документ закупки"
-            )
-
-            open_action = menu.addAction(
-                "Открыть карточку экземпляра"
-            )
-
-        else:
-            open_action = menu.addAction(
-                "Открыть карточку экземпляра"
-            )
+        open_action = menu.addAction(
+            "Открыть карточку экземпляра"
+        )
 
         action = menu.exec(
             self.instances_list.mapToGlobal(position)
@@ -1204,7 +1186,7 @@ class ProductCard(QWidget):
         if action == open_action:
             self.open_instance(item)
 
-        elif action == purchase_action:
+        elif action == purchase_action and purchase_action is not None:
             from models.purchase import get_purchase_id_by_instance
 
             instance_id = item.data(
@@ -1220,7 +1202,7 @@ class ProductCard(QWidget):
                     int(purchase_id)
                 )
 
-        elif action == sale_action:
+        elif action == sale_action and sale_action is not None:
             from models.sale import get_sale_id_by_instance
 
             instance_id = item.data(

@@ -235,7 +235,6 @@ class MainWindow(QMainWindow):
             allow_deleted=True
         )
 
-        self.tabs.setCurrentIndex(tab_index)
     def open_sale(
         self,
         sale_id,
@@ -507,7 +506,12 @@ class MainWindow(QMainWindow):
             lambda: Trash(self)
         )
     def refresh_inventory(self):
-        self.inventory_tab.load_products()
+        for index in range(self.tabs.count()):
+            widget = self.tabs.widget(index)
+
+            if isinstance(widget, Inventory):
+                widget.load_products()
+                return
     def refresh_current_tab(self, index):
         widget = self.tabs.widget(index)
 
