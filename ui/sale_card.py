@@ -1248,6 +1248,75 @@ class SaleCard(QWidget):
 
         self.complete_sale()
     def save_sale_changes(self):
+        from database.database import get_connection
+
+        connection = get_connection()
+        try:
+            total_profit = 0
+
+            for row in range(self.items_table.rowCount()):
+                instance_id = self.items_table.item(
+                    row, 0
+                ).data(Qt.UserRole)
+
+                sale_price = self.items_table.cellWidget(
+                    row, 7
+                ).value()
+
+                buyer_shipping = self.items_table.cellWidget(
+                    row, 8
+                ).value()
+
+                packaging = self.items_table.cellWidget(
+                    row, 9
+                ).value()
+
+                commission = self.items_table.cellWidget(
+                    row, 10
+                ).value()
+
+                result = connection.execute(
+                    """
+                    SELECT purchase_price, purchase_shipping
+                    FROM instances
+                    WHERE id = ?
+                    """,
+                    (instance_id,)
+                ).fetchone()
+
+                if result is None:
+                    raise ValueError(
+                        f"Экземпляр №{instance_id} не найден."
+                    )
+
+                purchase_price, purchase_shipping = result
+
+                total_profit += (
+                    sale_price
+                    - buyer_shipping
+                    - packaging
+                    - commission
+                    - (purchase_price or 0)
+                    - (purchase_shipping or 0)
+                )
+        finally:
+            connection.close()
+
+        if total_profit < 0:
+            answer = QMessageBox.question(
+                self,
+                "Продажа в убыток",
+                (
+                    f"После сохранения изменений общая прибыль "
+                    f"составит {total_profit:.2f}.\n\n"
+                    "Сохранить изменения и оставить продажу в убыток?"
+                ),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if answer != QMessageBox.Yes:
+                return
         from models.sale import (
             update_sale,
             update_sale_item,
@@ -1440,6 +1509,58 @@ class SaleCard(QWidget):
             })
 
         from models.sale import finalize_sale
+        from database.database import get_connection
+
+        connection = get_connection()
+        try:
+            total_profit = 0
+
+            for item in items:
+                cursor = connection.execute(
+                    """
+                    SELECT purchase_price, purchase_shipping
+                    FROM instances
+                    WHERE id = ?
+                    """,
+                    (item["instance_id"],)
+                )
+                result = cursor.fetchone()
+
+                if result is None:
+                    raise ValueError(
+                        f"Экземпляр №{item['instance_id']} не найден."
+                    )
+
+                purchase_price, purchase_shipping = result
+
+                profit = (
+                    item["sale_price"]
+                    - item["buyer_shipping"]
+                    - item["packaging"]
+                    - item["commission"]
+                    - (purchase_price or 0)
+                    - (purchase_shipping or 0)
+                )
+
+                total_profit += profit
+        finally:
+            connection.close()
+
+        if total_profit < 0:
+            answer = QMessageBox.question(
+                self,
+                "Продажа в убыток",
+                (
+                    f"Общая прибыль по продаже составит "
+                    f"{total_profit:.2f}, то есть будет получен убыток.\n\n"
+                    "Всё равно завершить продажу?"
+                ),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if answer != QMessageBox.Yes:
+                return
 
         try:
             sale_id, sale_number = finalize_sale(
