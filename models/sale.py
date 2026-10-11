@@ -13,7 +13,6 @@ def finalize_sale(
 
         total_buyer_paid = sum(
             item["sale_price"]
-            + item["buyer_shipping"]
             for item in items
         )
 
