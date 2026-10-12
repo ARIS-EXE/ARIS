@@ -631,6 +631,367 @@ def create_purchase_multi(
 
     finally:
         connection.close()
+
+
+def update_purchase(
+    purchase_id,
+    total_purchase_price,
+    total_shipping,
+    purchase_date,
+    items,
+    existing_instance_ids=None,
+):
+    existing_instance_ids = existing_instance_ids or []
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "SELECT id FROM purchases WHERE id = ?",
+            (purchase_id,)
+        )
+        if cursor.fetchone() is None:
+            raise ValueError("Закупка не найдена.")
+
+        # Текущий состав закупки
+        cursor.execute(
+            """
+            SELECT instance_id
+            FROM purchase_items
+            WHERE purchase_id = ?
+            """,
+            (purchase_id,)
+        )
+        old_ids = {row[0] for row in cursor.fetchall()}
+
+        # Новый состав: экземпляры, оставленные в таблице,
+        # плюс новые товары и существующие экземпляры.
+        kept_ids = set(existing_instance_ids)
+
+        if len(kept_ids) != len(existing_instance_ids):
+            raise ValueError("Один экземпляр добавлен несколько раз.")
+
+        new_items = []
+        for item in items:
+            product_id = item.get("product_id")
+            count = item.get("count")
+
+            if product_id is None or not isinstance(count, int) or count <= 0:
+                raise ValueError("Проверьте товар и количество.")
+
+            new_items.append({
+                "product_id": product_id,
+                "count": count,
+            })
+
+        # Проверяем экземпляры, которые исключаются из закупки.
+        removed_ids = old_ids - kept_ids
+
+        for instance_id in removed_ids:
+            cursor.execute(
+                """
+                SELECT status
+                FROM instances
+                WHERE id = ?
+                """,
+                (instance_id,)
+            )
+            result = cursor.fetchone()
+
+            if result is None:
+                raise ValueError(
+                    f"Экземпляр ID {instance_id} не найден."
+                )
+
+            if result[0] == "sold":
+                raise ValueError(
+                    "Нельзя исключить из закупки проданный экземпляр."
+                )
+
+            cursor.execute(
+                """
+                SELECT 1
+                FROM sale_items
+                WHERE instance_id = ?
+                  AND active = 1
+                LIMIT 1
+                """,
+                (instance_id,)
+            )
+            if cursor.fetchone():
+                raise ValueError(
+                    "Нельзя исключить экземпляр с активной продажей."
+                )
+
+        # Проверяем новые существующие экземпляры:
+        # они должны быть свободны и не удалены.
+        for instance_id in kept_ids - old_ids:
+            cursor.execute(
+                """
+                SELECT id
+                FROM instances
+                WHERE id = ?
+                  AND deleted = 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM purchase_items
+                      WHERE purchase_items.instance_id = instances.id
+                  )
+                """,
+                (instance_id,)
+            )
+            if cursor.fetchone() is None:
+                raise ValueError(
+                    f"Экземпляр ID {instance_id} уже связан с закупкой "
+                    "или недоступен."
+                )
+
+        # Убираем исключённые экземпляры из закупки и инвентаря,
+        # сохраняя запись экземпляра в базе.
+        for instance_id in removed_ids:
+            cursor.execute(
+                """
+                DELETE FROM purchase_items
+                WHERE purchase_id = ?
+                  AND instance_id = ?
+                """,
+                (purchase_id, instance_id)
+            )
+            cursor.execute(
+                """
+                UPDATE instances
+                SET deleted = 1
+                WHERE id = ?
+                """,
+                (instance_id,)
+            )
+
+        # Создаём новые экземпляры для строк с товаром и количеством.
+        for item in new_items:
+            for _ in range(item["count"]):
+                cursor.execute(
+                    "SELECT COALESCE(MAX(internal_number), 0) + 1 FROM instances"
+                )
+                internal_number = cursor.fetchone()[0]
+
+                cursor.execute(
+                    """
+                    INSERT INTO instances (
+                        internal_number,
+                        product_id,
+                        condition,
+                        purchase_price,
+                        purchase_shipping,
+                        purchase_date,
+                        status,
+                        notes,
+                        deleted,
+                        created_at
+                    )
+                    VALUES (?, ?, 'new', 0, 0, ?, 'in_stock', '', 0,
+                            datetime('now'))
+                    """,
+                    (internal_number, item["product_id"], purchase_date)
+                )
+                kept_ids.add(cursor.lastrowid)
+
+        final_ids = list(kept_ids)
+
+        if not final_ids:
+            raise ValueError("В закупке должен остаться хотя бы один экземпляр.")
+
+        purchase_prices = distribute_amount(
+            total_purchase_price, len(final_ids)
+        )
+        purchase_shippings = distribute_amount(
+            total_shipping, len(final_ids)
+        )
+
+        cursor.execute(
+            """
+            UPDATE purchases
+            SET purchase_date = ?,
+                total_purchase_price = ?,
+                total_shipping = ?
+            WHERE id = ?
+            """,
+            (
+                purchase_date,
+                total_purchase_price,
+                total_shipping,
+                purchase_id
+            )
+        )
+
+        for index, instance_id in enumerate(final_ids):
+            purchase_price = purchase_prices[index]
+            purchase_shipping = purchase_shippings[index]
+
+            cursor.execute(
+                """
+                SELECT product_id
+                FROM instances
+                WHERE id = ?
+                """,
+                (instance_id,)
+            )
+            product_id = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                UPDATE instances
+                SET purchase_price = ?,
+                    purchase_shipping = ?,
+                    purchase_date = ?
+                WHERE id = ?
+                """,
+                (
+                    purchase_price,
+                    purchase_shipping,
+                    purchase_date,
+                    instance_id
+                )
+            )
+
+            cursor.execute(
+                """
+                UPDATE purchase_items
+                SET allocated_purchase_price = ?,
+                    allocated_shipping = ?
+                WHERE purchase_id = ?
+                  AND instance_id = ?
+                """,
+                (
+                    purchase_price,
+                    purchase_shipping,
+                    purchase_id,
+                    instance_id
+                )
+            )
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM purchase_items
+                WHERE purchase_id = ?
+                  AND instance_id = ?
+                """,
+                (purchase_id, instance_id)
+            )
+            if cursor.fetchone() is None:
+                cursor.execute(
+                    """
+                    INSERT INTO purchase_items (
+                        purchase_id,
+                        instance_id,
+                        allocated_purchase_price,
+                        allocated_shipping
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        purchase_id,
+                        instance_id,
+                        purchase_price,
+                        purchase_shipping
+                    )
+                )
+
+            # Сохраняем событие закупки для новых связей.
+            cursor.execute(
+                """
+                SELECT 1
+                FROM events
+                WHERE purchase_id = ?
+                  AND instance_id = ?
+                  AND event_type = 'purchase'
+                LIMIT 1
+                """,
+                (purchase_id, instance_id)
+            )
+            if cursor.fetchone() is None:
+                cursor.execute(
+                    """
+                    INSERT INTO events (
+                        event_date,
+                        event_type,
+                        instance_id,
+                        product_id,
+                        purchase_id,
+                        amount
+                    )
+                    VALUES (?, 'purchase', ?, ?, ?, ?)
+                    """,
+                    (
+                        purchase_date,
+                        instance_id,
+                        product_id,
+                        purchase_id,
+                        purchase_price + purchase_shipping
+                    )
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE events
+                    SET event_date = ?,
+                        amount = ?
+                    WHERE purchase_id = ?
+                      AND instance_id = ?
+                      AND event_type = 'purchase'
+                    """,
+                    (
+                        purchase_date,
+                        purchase_price + purchase_shipping,
+                        purchase_id,
+                        instance_id
+                    )
+                )
+
+            # Пересчитываем прибыль активных продаж экземпляра.
+            cursor.execute(
+                """
+                SELECT id, sale_price, buyer_shipping, packaging, commission
+                FROM sale_items
+                WHERE instance_id = ?
+                  AND active = 1
+                """,
+                (instance_id,)
+            )
+
+            for sale in cursor.fetchall():
+                sale_item_id, sale_price, buyer_shipping, packaging, commission = sale
+
+                profit = (
+                    sale_price
+                    - buyer_shipping
+                    - packaging
+                    - commission
+                    - purchase_price
+                    - purchase_shipping
+                )
+
+                cursor.execute(
+                    """
+                    UPDATE sale_items
+                    SET profit = ?
+                    WHERE id = ?
+                      AND active = 1
+                    """,
+                    (profit, sale_item_id)
+                )
+
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
 def delete_purchase_instance(instance_id):
     connection = get_connection()
 

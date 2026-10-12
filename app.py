@@ -29,6 +29,7 @@ from ui.trash import Trash
 from ui.dashboard import Dashboard
 from backup.backup_settings_dialog import BackupSettingsDialog
 from backup.backup_manager import create_automatic_backup
+from ui.settings import SettingsDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -126,46 +127,15 @@ class MainWindow(QMainWindow):
 
         left_layout.addStretch(1)
 
-        backup_frame = QFrame()
-        backup_frame.setFrameShape(QFrame.StyledPanel)
-        backup_frame.setFrameShadow(QFrame.Plain)
-        backup_frame.setFixedWidth(180)
 
-        backup_layout = QVBoxLayout(backup_frame)
-        backup_layout.setContentsMargins(8, 8, 8, 8)
-        backup_layout.setSpacing(6)
-
-        backup_title = QLabel("Резервное копирование")
-        backup_title.setStyleSheet(
-            "font-weight: bold;"
+        settings_button = QPushButton("Настройки")
+        settings_button.setFixedWidth(180)
+        settings_button.clicked.connect(
+            self.open_settings
         )
 
-        backup_buttons_layout = QVBoxLayout()
-        backup_buttons_layout.setSpacing(4)
+        left_layout.addWidget(settings_button)
 
-        backup_create_button = QPushButton("Создать")
-        backup_restore_button = QPushButton("Восстановить")
-        backup_restore_button.clicked.connect(
-            self.restore_backup
-        )
-        backup_settings_button = QPushButton("Настроить")
-        backup_settings_button.clicked.connect(
-            self.open_backup_settings
-        )
-        backup_create_button.setFixedHeight(28)
-        backup_restore_button.setFixedHeight(28)
-        backup_settings_button.setFixedHeight(28)
-        backup_create_button.clicked.connect(
-            self.create_backup
-        )
-        backup_buttons_layout.addWidget(backup_create_button)
-        backup_buttons_layout.addWidget(backup_restore_button)
-        backup_buttons_layout.addWidget(backup_settings_button)
-
-        backup_layout.addWidget(backup_title)
-        backup_layout.addLayout(backup_buttons_layout)
-
-        left_layout.addWidget(backup_frame)
 
         main_layout.addLayout(left_layout, 0)
         self.dashboard = Dashboard()
@@ -300,19 +270,26 @@ class MainWindow(QMainWindow):
         )
 
 
-    def open_purchase(self, purchase_id):
+
+    def open_purchase(self, purchase_id, read_only=False):
         purchase_tab = PurchaseCard(
             self,
-            purchase_id=purchase_id
+            purchase_id=purchase_id,
+            read_only=read_only
+        )
+
+        title = (
+            "Просмотр закупки"
+            if read_only
+            else "Редактирование закупки"
         )
 
         tab_index = self.tabs.addTab(
             purchase_tab,
-            "Просмотр закупки"
+            title
         )
 
         self.tabs.setCurrentIndex(tab_index)
-
 
     def open_purchase_for_instance(self, instance_id):
         from models.instance import get_instance
@@ -416,6 +393,10 @@ class MainWindow(QMainWindow):
 
     def open_backup_settings(self):
         dialog = BackupSettingsDialog(self)
+        dialog.exec()
+
+    def open_settings(self):
+        dialog = SettingsDialog(self)
         dialog.exec()
 
     def restore_backup(self):

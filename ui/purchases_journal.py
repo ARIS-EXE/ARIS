@@ -176,13 +176,23 @@ class PurchasesJournal(QWidget):
                 "Открыть закупку"
             )
 
+            edit_purchase_action = menu.addAction(
+                "Редактировать закупку"
+            )
+
             action = menu.exec(
                 self.tree.viewport().mapToGlobal(position)
             )
 
             if action == open_purchase_action:
                 self.main_window.open_purchase(
-                    int(purchase_id)
+                    int(purchase_id),
+                    read_only=True
+                )
+            elif action == edit_purchase_action:
+                self.main_window.open_purchase(
+                    int(purchase_id),
+                    read_only=False
                 )
 
             return

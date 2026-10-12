@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QMenu
 )
-
+from database.database import get_connection
 
 class SaleCard(QWidget):
 
@@ -660,8 +660,9 @@ class SaleCard(QWidget):
                 purchase_shipping=result[8],
                 default_buyer_shipping=result[9],
                 default_packaging=result[10],
-                default_commission_type=result[11],
-                default_commission_value=result[12]:
+                default_delivery_option_id=result[11],
+                default_commission_type=result[12],
+                default_commission_value=result[13]:
                 self.select_instance(
                     instance_id,
                     internal_number,
@@ -673,6 +674,7 @@ class SaleCard(QWidget):
                     purchase_shipping,
                     default_buyer_shipping,
                     default_packaging,
+                    default_delivery_option_id,
                     default_commission_type,
                     default_commission_value,
                     dialog
@@ -854,6 +856,7 @@ class SaleCard(QWidget):
         purchase_shipping,
         default_buyer_shipping,
         default_packaging,
+        default_delivery_option_id,
         default_commission_type,
         default_commission_value,
         dialog
@@ -965,7 +968,36 @@ class SaleCard(QWidget):
             7,
             sale_price
         )
+        delivery_shipping = None
+        delivery_packaging = None
 
+        if default_delivery_option_id is not None:
+            connection = get_connection()
+
+            try:
+                cursor = connection.execute(
+                    """
+                    SELECT shipping_cost, packaging_cost
+                    FROM delivery_options
+                    WHERE id = ?
+                    """,
+                    (default_delivery_option_id,)
+                )
+
+                delivery_option = cursor.fetchone()
+
+                if delivery_option is not None:
+                    delivery_shipping = delivery_option[0]
+                    delivery_packaging = delivery_option[1]
+
+            finally:
+                connection.close()
+
+        if delivery_shipping is None:
+            delivery_shipping = default_buyer_shipping
+
+        if delivery_packaging is None:
+            delivery_packaging = default_packaging
         buyer_shipping = QSpinBox()
 
         buyer_shipping.setRange(
@@ -978,7 +1010,7 @@ class SaleCard(QWidget):
         )
 
         buyer_shipping.setValue(
-            default_buyer_shipping or 0
+            delivery_shipping or 0
         )
 
         self.items_table.setCellWidget(
@@ -999,7 +1031,7 @@ class SaleCard(QWidget):
         )
 
         packaging.setValue(
-            default_packaging or 0
+            delivery_packaging or 0
         )
 
         self.items_table.setCellWidget(

@@ -310,6 +310,7 @@ def search_instances(search_text):
                 instances.purchase_shipping,
                 products.default_buyer_shipping,
                 products.default_packaging,
+                products.default_delivery_option_id,
                 products.default_commission_type,
                 products.default_commission_value
             FROM instances

@@ -25,18 +25,24 @@ from PySide6.QtCore import QDate, Qt
 from database.database import get_connection
 from models.purchase import (
     create_purchase_multi,
+    update_purchase,
     get_unlinked_instances,
 )
 
 class PurchaseCard(QWidget):
 
-    def __init__(self, main_window, purchase_id=None):
+    def __init__(
+        self,
+        main_window,
+        purchase_id=None,
+        read_only=False
+    ):
         super().__init__()
 
         self.main_window = main_window
         self.purchase_saved = False
         self.purchase_id = purchase_id
-
+        self.read_only = read_only
         layout = QVBoxLayout()
 
         # ============================================================
@@ -323,6 +329,22 @@ class PurchaseCard(QWidget):
 
         if self.purchase_id is not None:
             self.load_purchase(self.purchase_id)
+
+        if self.read_only:
+            self.set_read_only_mode()
+    def set_read_only_mode(self):
+        self.purchase_date.setEnabled(False)
+        self.total_purchase_price.setEnabled(False)
+        self.total_shipping.setEnabled(False)
+
+        self.product_search.setEnabled(False)
+        self.product_list.setEnabled(False)
+        self.count.setEnabled(False)
+
+        self.new_product_button.setEnabled(False)
+        self.add_button.setEnabled(False)
+        self.add_existing_instance_button.setEnabled(False)
+        self.save_button.setEnabled(False)
     def load_products(self):
         connection = get_connection()
 
@@ -521,7 +543,10 @@ class PurchaseCard(QWidget):
                 1000
             )
 
-            if existing_product_id == product_id:
+            if (
+                product_item.data(Qt.UserRole + 1) is None
+                and existing_product_id == product_id
+            ):
                 current_count = int(
                     count_item.text()
                 )
@@ -821,7 +846,7 @@ class PurchaseCard(QWidget):
 
         delete_row_action = None
 
-        if not self.purchase_saved:
+        if not self.purchase_saved or self.purchase_id is not None:
             menu.addSeparator()
 
             delete_row_action = menu.addAction(
@@ -911,51 +936,34 @@ class PurchaseCard(QWidget):
                 write_off_comment,
             ) = item
 
-            if product_id not in products_count:
-                products_count[product_id] = {
-                    "text": " | ".join(
-                        part
-                        for part in [
-                            manufacturer,
-                            part_number,
-                            name
-                        ]
-                        if part
-                    ),
-                    "count": 0
-                }
-
-            products_count[product_id]["count"] += 1
-
-        for product_id, data in products_count.items():
             row = self.items_table.rowCount()
             self.items_table.insertRow(row)
 
+            product_name = " | ".join(
+                part for part in (
+                    manufacturer,
+                    part_number,
+                    name
+                ) if part
+            )
+
             product_item = QTableWidgetItem(
-                data["text"]
+                f"Экземпляр № {internal_number} — {product_name}"
+            )
+            product_item.setData(
+                Qt.UserRole + 1,
+                instance_id
             )
             product_item.setData(
                 1000,
                 product_id
             )
 
-            count_item = QTableWidgetItem(
-                str(data["count"])
-            )
+            count_item = QTableWidgetItem("1")
 
-            self.items_table.setItem(
-                row,
-                0,
-                product_item
-            )
+            self.items_table.setItem(row, 0, product_item)
+            self.items_table.setItem(row, 1, count_item)
 
-            self.items_table.setItem(
-                row,
-                1,
-                count_item
-            )
-
-        # Переводим карточку в состояние после сохранения
         self.purchase_saved = True
 
         self.product_search.clear()
@@ -965,15 +973,26 @@ class PurchaseCard(QWidget):
         self.product_image.clear()
         self.product_image.setText("Фото товара")
 
-        self.product_search.setEnabled(False)
-        self.count.setEnabled(False)
-        self.add_button.setEnabled(False)
-        self.save_button.setEnabled(False)
-        self.purchase_date.setEnabled(False)
-        self.total_purchase_price.setEnabled(False)
-        self.total_shipping.setEnabled(False)
+        self.product_search.setEnabled(True)
+        self.product_list.setEnabled(True)
+        self.count.setEnabled(True)
+        self.new_product_button.setEnabled(True)
+        self.add_button.setEnabled(True)
+        self.add_existing_instance_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.purchase_date.setEnabled(True)
+        self.total_purchase_price.setEnabled(True)
+        self.total_shipping.setEnabled(True)
+
+        self.save_button.setText("Сохранить изменения")
+
+        if self.read_only:
+            self.set_read_only_mode()
 
     def save_purchase(self):
+        if self.purchase_id is not None:
+            self.update_existing_purchase()
+            return
         items = []
         existing_instance_ids = []
 
@@ -1084,6 +1103,89 @@ class PurchaseCard(QWidget):
         self.purchase_date.setEnabled(False)
         self.total_purchase_price.setEnabled(False)
         self.total_shipping.setEnabled(False)
+
+    def update_existing_purchase(self):
+        items = []
+        existing_instance_ids = []
+
+        for row in range(self.items_table.rowCount()):
+            product_item = self.items_table.item(row, 0)
+            count_item = self.items_table.item(row, 1)
+
+            if product_item is None or count_item is None:
+                continue
+
+            instance_id = product_item.data(Qt.UserRole + 1)
+
+            if instance_id is not None:
+                existing_instance_ids.append(instance_id)
+                continue
+
+            product_id = product_item.data(1000)
+
+            if product_id is None:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    f"Не удалось определить товар в строке {row + 1}."
+                )
+                return
+
+            try:
+                count = int(count_item.text())
+            except ValueError:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    f"Некорректное количество в строке {row + 1}."
+                )
+                return
+
+            if count <= 0:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Количество должно быть больше нуля."
+                )
+                return
+
+            items.append({
+                "product_id": product_id,
+                "count": count,
+            })
+
+        if not items and not existing_instance_ids:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "В закупке должен остаться хотя бы один экземпляр."
+            )
+            return
+
+        try:
+            update_purchase(
+                purchase_id=self.purchase_id,
+                total_purchase_price=self.total_purchase_price.value(),
+                total_shipping=self.total_shipping.value(),
+                purchase_date=self.purchase_date.date().toString("yyyy-MM-dd"),
+                items=items,
+                existing_instance_ids=existing_instance_ids,
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                str(error)
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Готово",
+            "Закупка обновлена. Себестоимость и прибыль пересчитаны."
+        )
+
+        self.load_purchase(self.purchase_id)
 
     def show_product_list_context_menu(self, position):
         item = self.product_list.itemAt(position)

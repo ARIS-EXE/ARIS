@@ -215,10 +215,20 @@ def initialize_database():
 
         CREATE INDEX IF NOT EXISTS idx_events_instance
             ON events(instance_id);
+
         CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode_unique
         ON products(barcode)
         WHERE barcode IS NOT NULL AND barcode != '';
+
+
+        CREATE TABLE IF NOT EXISTS delivery_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            shipping_cost INTEGER NOT NULL DEFAULT 0,
+            packaging_cost INTEGER NOT NULL DEFAULT 0
+        );
     """)
+
 
     try:
         connection.execute(
@@ -227,6 +237,18 @@ def initialize_database():
     except sqlite3.OperationalError as error:
         if "duplicate column name" not in str(error):
             raise
+
+    try:
+        connection.execute(
+            """
+            ALTER TABLE products
+            ADD COLUMN default_delivery_option_id INTEGER
+            """
+        )
+    except sqlite3.OperationalError as error:
+        if "duplicate column name" not in str(error):
+            raise
+
     try:
         connection.execute(
             "ALTER TABLE products ADD COLUMN image_path TEXT"

@@ -162,6 +162,15 @@ class ProductCard(QWidget):
             10_000_000
         )
         self.buyer_shipping.setSuffix(" ¥")
+
+        self.delivery_option = QComboBox()
+        self.delivery_option.addItem("Не выбран", None)
+        self.load_delivery_options()
+
+        self.delivery_option.activated.connect(
+            self.on_delivery_option_changed
+        )
+
         self.commission_type = QComboBox()
 
         self.commission_type.addItem(
@@ -222,7 +231,7 @@ class ProductCard(QWidget):
             "Доставка покупателя:",
             self.buyer_shipping
         )
-
+        left_sale_form.addRow("Вариант доставки:", self.delivery_option)
         right_sale_form.addRow(
             "Комиссия Yahoo:",
             commission_layout
@@ -1290,6 +1299,7 @@ class ProductCard(QWidget):
                     notes,
                     default_packaging,
                     default_buyer_shipping,
+                    default_delivery_option_id,
                     default_commission_type,
                     default_commission_value,
                     image_path
@@ -1365,8 +1375,21 @@ class ProductCard(QWidget):
             product[9] or 0
         )
 
+        delivery_option_id = product[10]
+
+        delivery_index = self.delivery_option.findData(
+            delivery_option_id
+        )
+
+        if delivery_index >= 0:
+            self.delivery_option.setCurrentIndex(
+                delivery_index
+            )
+        else:
+            self.delivery_option.setCurrentIndex(0)
+
         commission_type = (
-            product[10] or "percent"
+            product[11] or "percent"
         )
 
         index = self.commission_type.findData(
@@ -1379,18 +1402,43 @@ class ProductCard(QWidget):
             )
 
         self.commission_value.setValue(
-            product[11] or 0
+            product[12] or 0
         )
 
         self.image_filename = (
-            product[12]
-            if product[12]
+            product[13]
+            if product[13]
             else None
         )
 
         self.load_image_preview()
 
         self.update_image_buttons()
+
+
+    def load_delivery_options(self):
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, name
+            FROM delivery_options
+            ORDER BY name COLLATE NOCASE
+            """
+        )
+
+        options = cursor.fetchall()
+        connection.close()
+
+        for option_id, name in options:
+            self.delivery_option.addItem(name, option_id)
+
+    def on_delivery_option_changed(self, index):
+        if self.delivery_option.currentData() is not None:
+            self.packaging.setValue(0)
+            self.buyer_shipping.setValue(0)
+
 
     # =============================================================
     # Сохранение
@@ -1415,7 +1463,9 @@ class ProductCard(QWidget):
             commission_type = (
                 self.commission_type.currentData()
             )
-
+            delivery_option_id = (
+                self.delivery_option.currentData()
+            )
             if self.product_id is None:
 
                 cursor = connection.execute(
@@ -1431,11 +1481,12 @@ class ProductCard(QWidget):
                         notes,
                         default_packaging,
                         default_buyer_shipping,
+                        default_delivery_option_id,
                         default_commission_type,
                         default_commission_value,
                         created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.barcode.text().strip()
@@ -1462,7 +1513,7 @@ class ProductCard(QWidget):
                         self.packaging.value(),
 
                         self.buyer_shipping.value(),
-
+                        delivery_option_id,
                         commission_type,
 
                         self.commission_value.value(),
@@ -1513,6 +1564,7 @@ class ProductCard(QWidget):
                         notes = ?,
                         default_packaging = ?,
                         default_buyer_shipping = ?,
+                        default_delivery_option_id = ?,
                         default_commission_type = ?,
                         default_commission_value = ?
                     WHERE id = ?
@@ -1542,7 +1594,7 @@ class ProductCard(QWidget):
                         self.packaging.value(),
 
                         self.buyer_shipping.value(),
-
+                        delivery_option_id,
                         commission_type,
 
                         self.commission_value.value(),
