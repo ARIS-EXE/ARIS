@@ -563,6 +563,80 @@ class PurchaseCard(QWidget):
             1,
             count_item
         )
+
+    def add_instance_to_purchase(self, instance_id):
+        from models.instance import get_instance
+
+        instance = get_instance(instance_id)
+
+        if instance is None or instance[9]:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Экземпляр не найден или удалён."
+            )
+            return
+
+        for row in range(self.items_table.rowCount()):
+            product_item = self.items_table.item(row, 0)
+
+            if (
+                product_item is not None
+                and product_item.data(Qt.UserRole + 1) == instance_id
+            ):
+                QMessageBox.information(
+                    self,
+                    "Уже добавлен",
+                    "Этот экземпляр уже добавлен в закупку."
+                )
+                return
+
+        internal_number = instance[1]
+        product_id = instance[2]
+
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                """
+                SELECT manufacturer, part_number, name
+                FROM products
+                WHERE id = ? AND deleted = 0
+                """,
+                (product_id,)
+            )
+            product = cursor.fetchone()
+        finally:
+            connection.close()
+
+        if product is None:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Не удалось найти товар этого экземпляра."
+            )
+            return
+
+        product_name = " ".join(
+            str(value)
+            for value in product
+            if value is not None and str(value).strip()
+        )
+
+        row = self.items_table.rowCount()
+        self.items_table.insertRow(row)
+
+        product_item = QTableWidgetItem(
+            f"Экземпляр № {internal_number} — {product_name}"
+        )
+        product_item.setData(Qt.UserRole + 1, instance_id)
+        product_item.setData(Qt.UserRole, None)
+
+        count_item = QTableWidgetItem("1")
+
+        self.items_table.setItem(row, 0, product_item)
+        self.items_table.setItem(row, 1, count_item)
+
     def add_existing_instance(self):
         instances = get_unlinked_instances()
 

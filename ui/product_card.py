@@ -1150,6 +1150,7 @@ class ProductCard(QWidget):
         self.update_delete_button()
 
 
+
     def show_instance_context_menu(self, position):
         item = self.instances_list.itemAt(position)
 
@@ -1160,15 +1161,29 @@ class ProductCard(QWidget):
             Qt.ItemDataRole.UserRole + 1
         )
 
+        instance_id = item.data(
+            Qt.ItemDataRole.UserRole
+        )
+
+        from models.purchase import get_purchase_id_by_instance
+
+        purchase_id = get_purchase_id_by_instance(instance_id)
+
         menu = QMenu(self)
 
         purchase_action = None
+        buy_action = None
         sale_action = None
 
         if status in ("in_stock", "sold", "written_off"):
-            purchase_action = menu.addAction(
-                "Открыть документ закупки"
-            )
+            if purchase_id is not None:
+                purchase_action = menu.addAction(
+                    "Открыть документ закупки"
+                )
+            else:
+                buy_action = menu.addAction(
+                    "Закупить"
+                )
 
         if status == "sold":
             sale_action = menu.addAction(
@@ -1186,32 +1201,20 @@ class ProductCard(QWidget):
         if action == open_action:
             self.open_instance(item)
 
+        elif action == buy_action and buy_action is not None:
+            self.window().open_purchase_for_instance(
+                int(instance_id)
+            )
+
         elif action == purchase_action and purchase_action is not None:
-            from models.purchase import get_purchase_id_by_instance
-
-            instance_id = item.data(
-                Qt.ItemDataRole.UserRole
+            self.window().open_purchase(
+                int(purchase_id)
             )
-
-            purchase_id = get_purchase_id_by_instance(
-                instance_id
-            )
-
-            if purchase_id is not None:
-                self.window().open_purchase(
-                    int(purchase_id)
-                )
 
         elif action == sale_action and sale_action is not None:
             from models.sale import get_sale_id_by_instance
 
-            instance_id = item.data(
-                Qt.ItemDataRole.UserRole
-            )
-
-            sale_id = get_sale_id_by_instance(
-                instance_id
-            )
+            sale_id = get_sale_id_by_instance(instance_id)
 
             if sale_id is not None:
                 self.window().open_sale(

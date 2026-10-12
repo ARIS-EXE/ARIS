@@ -299,6 +299,7 @@ class MainWindow(QMainWindow):
             tab_index
         )
 
+
     def open_purchase(self, purchase_id):
         purchase_tab = PurchaseCard(
             self,
@@ -310,9 +311,31 @@ class MainWindow(QMainWindow):
             "Просмотр закупки"
         )
 
-        self.tabs.setCurrentIndex(
-            tab_index
+        self.tabs.setCurrentIndex(tab_index)
+
+
+    def open_purchase_for_instance(self, instance_id):
+        from models.instance import get_instance
+
+        instance = get_instance(instance_id)
+
+        if instance is None or instance[9]:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Экземпляр не найден или удалён."
+            )
+            return
+
+        purchase_tab = PurchaseCard(self)
+        purchase_tab.add_instance_to_purchase(instance_id)
+
+        tab_index = self.tabs.addTab(
+            purchase_tab,
+            "Новая закупка"
         )
+
+        self.tabs.setCurrentIndex(tab_index)
 
     def add_placeholder_tab(self, name):
         tab = QWidget()
