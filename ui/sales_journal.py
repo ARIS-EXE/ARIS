@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
     QMessageBox,
+    QApplication,
     QMenu
 )
 
@@ -50,7 +51,7 @@ class SalesJournal(QWidget):
         self.sales_table.customContextMenuRequested.connect(
             self.show_context_menu
         )
-
+        self.sales_table.installEventFilter(self)
         self.expanded_sales = set()
 
         left_layout.addWidget(
@@ -81,7 +82,7 @@ class SalesJournal(QWidget):
             "Название",
             "Причина возврата"
         ])
-
+        self.returns_table.installEventFilter(self)
         right_layout.addWidget(
             returns_title
         )
@@ -241,6 +242,39 @@ class SalesJournal(QWidget):
             self.returns_table.addTopLevelItem(
                 item
             )
+
+    def eventFilter(self, obj, event):
+        if (
+            obj in (
+                self.sales_table,
+                self.returns_table
+            )
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.ControlModifier
+        ):
+            item = obj.currentItem()
+
+            if item is None:
+                return True
+
+            values = []
+
+            for column in range(obj.columnCount()):
+                if obj.isColumnHidden(column):
+                    continue
+
+                values.append(
+                    item.text(column)
+                )
+
+            QApplication.clipboard().setText(
+                "\t".join(values)
+            )
+
+            return True
+
+        return super().eventFilter(obj, event)
 
     def show_context_menu(self, position):
         item = self.sales_table.itemAt(position)

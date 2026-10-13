@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -47,6 +48,7 @@ class Categories(QWidget):
         main_layout.addLayout(input_layout)
 
         self.tree = QTreeWidget()
+        self.tree.installEventFilter(self)
         self.tree.setContextMenuPolicy(
             Qt.CustomContextMenu
         )
@@ -56,14 +58,26 @@ class Categories(QWidget):
         )
         self.tree.setHeaderLabel("Категории")
 
-        self.tree.itemDoubleClicked.connect(
-            self.rename_category
-        )
-
         main_layout.addWidget(self.tree)
 
         self.load_categories()
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.tree
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key.Key_C
+            and event.modifiers()
+            & Qt.KeyboardModifier.ControlModifier
+        ):
+            item = self.tree.currentItem()
 
+            if item is not None:
+                QApplication.clipboard().setText(
+                    item.text(0)
+                )
+                return True
+
+        return super().eventFilter(obj, event)
     def load_categories(self):
         expanded_categories = set()
 

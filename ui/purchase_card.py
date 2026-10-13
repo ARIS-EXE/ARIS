@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QMenu,
+    QApplication,
     QDialog
 )
 from pathlib import Path
@@ -51,7 +52,7 @@ class PurchaseCard(QWidget):
 
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(2)
-
+        self.items_table.installEventFilter(self)
         self.items_table.setHorizontalHeaderLabels([
             "Товар",
             "Количество"
@@ -332,6 +333,31 @@ class PurchaseCard(QWidget):
 
         if self.read_only:
             self.set_read_only_mode()
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.items_table
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            row = self.items_table.currentRow()
+
+            if row < 0:
+                return True
+
+            values = []
+
+            for column in range(self.items_table.columnCount()):
+                item = self.items_table.item(row, column)
+                values.append(item.text() if item else "")
+
+            QApplication.clipboard().setText(
+                "\t".join(values)
+            )
+
+            return True
+
+        return super().eventFilter(obj, event)
     def set_read_only_mode(self):
         self.purchase_date.setEnabled(False)
         self.total_purchase_price.setEnabled(False)

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QMessageBox,
+    QApplication,
     QMenu
 )
 from database.database import get_connection
@@ -97,7 +98,7 @@ class SaleCard(QWidget):
 
         # Таблица экземпляров
         self.items_table = QTableWidget()
-
+        self.items_table.installEventFilter(self)
         self.items_table.setEditTriggers(
             QTableWidget.NoEditTriggers
         )
@@ -188,7 +189,36 @@ class SaleCard(QWidget):
             self.add_item_button.setEnabled(
                 True
             )
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.items_table
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            row = self.items_table.currentRow()
 
+            if row < 0:
+                return True
+
+            values = []
+
+            for column in range(self.items_table.columnCount()):
+                widget = self.items_table.cellWidget(row, column)
+
+                if widget is not None and hasattr(widget, "value"):
+                    values.append(str(widget.value()))
+                else:
+                    item = self.items_table.item(row, column)
+                    values.append(item.text() if item else "")
+
+            QApplication.clipboard().setText(
+                "\t".join(values)
+            )
+
+            return True
+
+        return super().eventFilter(obj, event)
     def load_sale(self):
         from models.sale import (
             get_sale,

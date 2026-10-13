@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QInputDialog,
+    QApplication
 )
 
 from models.purchase import (
@@ -22,6 +23,7 @@ class PurchasesJournal(QWidget):
         layout = QVBoxLayout(self)
 
         self.tree = QTreeWidget()
+        self.tree.installEventFilter(self)
         self.tree.setContextMenuPolicy(
             Qt.CustomContextMenu
         )
@@ -153,6 +155,32 @@ class PurchasesJournal(QWidget):
             purchase_item.setExpanded(
                 purchase_item.text(0) in expanded_numbers
             )
+
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.tree
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            item = self.tree.currentItem()
+
+            if item is None:
+                return True
+
+            values = [
+                item.text(column)
+                for column in range(self.tree.columnCount())
+                if not self.tree.isColumnHidden(column)
+            ]
+
+            QApplication.clipboard().setText(
+                "\t".join(values)
+            )
+
+            return True
+
+        return super().eventFilter(obj, event)
 
     def show_context_menu(self, position):
         item = self.tree.itemAt(position)

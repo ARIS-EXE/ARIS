@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QSplitter,
     QLineEdit,
+    QApplication
 )
 from database.database import get_connection
 
@@ -19,6 +20,7 @@ class Trash(QWidget):
         self.layout = QVBoxLayout(self)
 
         self.product_list = QTreeWidget()
+        self.product_list.installEventFilter(self)
         self.product_list.setColumnCount(4)
         self.product_list.setHeaderLabels([
             "ID",
@@ -59,6 +61,7 @@ class Trash(QWidget):
         )
 
         self.written_off_list = QTreeWidget()
+        self.written_off_list.installEventFilter(self)
         self.written_off_list.setColumnCount(6)
         self.written_off_list.setHeaderLabels([
             "Дата",
@@ -121,6 +124,35 @@ class Trash(QWidget):
 
         self.load_products()
         self.load_written_offs()
+
+
+    def eventFilter(self, obj, event):
+        if (
+            obj in (
+                getattr(self, "product_list", None),
+                getattr(self, "written_off_list", None)
+            )
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            item = obj.currentItem()
+
+            if item is None:
+                return True
+
+            values = [
+                item.text(column)
+                for column in range(obj.columnCount())
+            ]
+
+            QApplication.clipboard().setText(
+                "\t".join(values)
+            )
+
+            return True
+
+        return super().eventFilter(obj, event)
 
     def show_context_menu(self, position):
         item = self.product_list.itemAt(position)

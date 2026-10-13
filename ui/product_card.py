@@ -6,6 +6,7 @@ import subprocess
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QFormLayout,
     QLineEdit,
@@ -380,7 +381,7 @@ class ProductCard(QWidget):
         )
 
         self.instances_list = QListWidget()
-
+        self.instances_list.installEventFilter(self)
         self.instances_list.itemDoubleClicked.connect(
             self.open_instance
         )
@@ -1158,7 +1159,22 @@ class ProductCard(QWidget):
             )
         self.update_delete_button()
 
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.instances_list
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            item = self.instances_list.currentItem()
 
+            if item is None:
+                return True
+
+            QApplication.clipboard().setText(item.text())
+            return True
+
+        return super().eventFilter(obj, event)
 
     def show_instance_context_menu(self, position):
         item = self.instances_list.itemAt(position)

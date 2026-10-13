@@ -1,5 +1,6 @@
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -144,6 +145,7 @@ class InstanceCard(QWidget):
         )
 
         self.history_list = QListWidget()
+        self.history_list.installEventFilter(self)
         self.history_list.setContextMenuPolicy(
             Qt.CustomContextMenu
         )
@@ -305,6 +307,28 @@ class InstanceCard(QWidget):
             instance[8] or ""
         )
         self.load_history()
+    def eventFilter(self, obj, event):
+        if (
+            obj is self.history_list
+            and event.type() == event.Type.KeyPress
+            and event.key() == Qt.Key_C
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            item = self.history_list.currentItem()
+
+            if item is None:
+                return True
+
+            row_widget = self.history_list.itemWidget(item)
+
+            if row_widget is not None:
+                labels = row_widget.findChildren(QLabel)
+                values = [label.text() for label in labels]
+                QApplication.clipboard().setText("\t".join(values))
+
+            return True
+
+        return super().eventFilter(obj, event)
     def save(self):
         from database.database import get_connection
 

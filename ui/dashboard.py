@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -22,7 +23,10 @@ from models.dashboard import (
 class Dashboard(QWidget):
     def __init__(self):
         super().__init__()
-
+        self.selected_month_block = None
+        self.setFocusPolicy(
+            Qt.FocusPolicy.StrongFocus
+        )
         main_layout = QVBoxLayout(self)
         data = get_dashboard_months()
 
@@ -142,9 +146,24 @@ class Dashboard(QWidget):
 
         return months[month - 1]
 
+
     def create_month_block(self, title, data):
         frame = QFrame()
-        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setCursor(Qt.CursorShape.PointingHandCursor)
+        frame.setProperty("copy_text", "\n".join([
+            title,
+            f"Прибыль: {data['profit']} ¥",
+            f"Расходы: {data['expenses']} ¥",
+            f"В продаже: {data['in_stock']} шт.",
+            f"Продано: {data['sold']} шт.",
+            f"Куплено: {data['purchased']} шт.",
+            f"Возвраты: {data['returned']} шт.",
+        ]))
+        frame.mousePressEvent = (
+            lambda event, block=frame:
+            self.select_month_block(block)
+        )
 
         layout = QVBoxLayout(frame)
 
@@ -152,7 +171,6 @@ class Dashboard(QWidget):
         title_label.setStyleSheet(
             "font-size: 18px; font-weight: bold;"
         )
-
         layout.addWidget(title_label)
 
         values = [
@@ -169,7 +187,6 @@ class Dashboard(QWidget):
 
             name_label = QLabel(name)
             value_label = QLabel(value)
-
             value_label.setStyleSheet(
                 "font-weight: bold;"
             )
@@ -177,13 +194,50 @@ class Dashboard(QWidget):
             row.addWidget(name_label)
             row.addStretch()
             row.addWidget(value_label)
-
             layout.addLayout(row)
 
         layout.addStretch()
-
         return frame
+
+    def select_month_block(self, block):
+        if self.selected_month_block is not None:
+            self.selected_month_block.setStyleSheet("")
+
+        self.selected_month_block = block
+
+        block.setStyleSheet("""
+            QFrame {
+                background-color: #F0F6FC;
+                border: 1px solid #B8D4F0;
+                border-radius: 8px;
+            }
+            QLabel {
+                background-color: transparent;
+                border: none;
+            }
+        """)
+
+        self.setFocus()
+
+
+    def keyPressEvent(self, event):
+        if (
+            event.key() == Qt.Key.Key_C
+            and event.modifiers()
+            & Qt.KeyboardModifier.ControlModifier
+        ):
+            block = self.selected_month_block
+
+            if block is not None:
+                QApplication.clipboard().setText(
+                    block.property("copy_text")
+                )
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
     def refresh(self):
+        self.selected_month_block = None
         # Полностью удаляем старое содержимое,
         # включая вложенные layouts.
         def clear_layout(layout):
