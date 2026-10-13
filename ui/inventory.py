@@ -716,8 +716,8 @@ class Inventory(QWidget):
                 condition,
                 "",
                 (
-                    f"Закупка: {instance[4] or 0} ¥ | "
-                    f"Доставка: {instance[5] or 0} ¥ | "
+                    f"Закупка: {instance[4] or 0}  | "
+                    f"Доставка: {instance[5] or 0}  | "
                     f"{instance[6]} | "
                     f"{status}"
                 ),

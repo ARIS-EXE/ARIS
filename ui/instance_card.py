@@ -51,15 +51,15 @@ class InstanceCard(QWidget):
 
         self.purchase_price = QSpinBox()
         self.purchase_price.setRange(0, 100000000)
-        self.purchase_price.setSuffix(" ¥")
+        self.purchase_price.setSpecialValueText(" ")
 
         self.purchase_shipping = QSpinBox()
         self.purchase_shipping.setRange(0, 100000000)
-        self.purchase_shipping.setSuffix(" ¥")
+        self.purchase_shipping.setSpecialValueText(" ")
 
         self.purchase_cost = QSpinBox()
         self.purchase_cost.setRange(0, 100000000)
-        self.purchase_cost.setSuffix(" ¥")
+        self.purchase_cost.setSpecialValueText(" ")
         self.purchase_cost.setReadOnly(True)
 
         self.purchase_price.valueChanged.connect(

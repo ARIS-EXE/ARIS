@@ -173,7 +173,7 @@ class SalesJournal(QWidget):
             item = QTreeWidgetItem([
                 str(sale[1]),
                 sale[2],
-                f"{sale[3]} ¥",
+                str(sale[3]),
                 sale[4] or "",
                 "Продажа",
                 "Завершена"
@@ -206,7 +206,7 @@ class SalesJournal(QWidget):
                 child = QTreeWidgetItem([
                     f"№{sale_item[2]}",
                     sale_item[3] or "",
-                    f"{sale_item[6]} ¥",
+                    str(sale_item[6]),
                     sale_item[5] or "",
                     "Экземпляр",
                     status

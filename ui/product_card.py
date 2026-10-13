@@ -135,7 +135,7 @@ class ProductCard(QWidget):
             0,
             10_000_000
         )
-        self.manufacturer_price.setSuffix(" ¥")
+        self.manufacturer_price.setSpecialValueText(" ")
         self.manufacturer_price.setFixedWidth(150)
 
         form.addRow("ID товара:", self.product_id_label)
@@ -154,7 +154,7 @@ class ProductCard(QWidget):
             0,
             10_000_000
         )
-        self.packaging.setSuffix(" ¥")
+        self.packaging.setSpecialValueText(" ")
         self.packaging.setFixedWidth(150)
 
         self.buyer_shipping = QSpinBox()
@@ -162,8 +162,7 @@ class ProductCard(QWidget):
             0,
             10_000_000
         )
-        self.buyer_shipping.setSuffix(" ¥")
-
+        self.buyer_shipping.setSpecialValueText(" ")
         self.delivery_option = QComboBox()
         self.delivery_option.addItem("Не выбран", None)
         self.load_delivery_options()
@@ -180,7 +179,7 @@ class ProductCard(QWidget):
         )
 
         self.commission_type.addItem(
-            "¥",
+            "Сумма",
             "fixed"
         )
 
@@ -234,7 +233,7 @@ class ProductCard(QWidget):
         )
         left_sale_form.addRow("Вариант доставки:", self.delivery_option)
         right_sale_form.addRow(
-            "Комиссия Yahoo:",
+            "Комиссия площадки:",
             commission_layout
         )
 
@@ -886,12 +885,13 @@ class ProductCard(QWidget):
         if commission_type == "fixed":
             self.commission_value.setDecimals(0)
             self.commission_value.setMinimum(0)
+            self.commission_value.setSpecialValueText(" ")
             self.commission_value.setMaximum(100_000_000)
-            self.commission_value.setSuffix(" ¥")
 
         else:
             self.commission_value.setDecimals(2)
             self.commission_value.setMinimum(0)
+            self.commission_value.setSpecialValueText(" ")
             self.commission_value.setMaximum(100)
             self.commission_value.setSuffix(" %")
 
@@ -1545,7 +1545,13 @@ class ProductCard(QWidget):
                 self.product_id_label.setText(
                     str(self.product_id)
                 )
+                self.product_id = cursor.lastrowid
 
+                self.product_id_label.setText(
+                    str(self.product_id)
+                )
+
+                connection.commit()
                 # Если изображение было выбрано
                 # до сохранения товара — теперь
                 # можно сохранить его под ID товара.

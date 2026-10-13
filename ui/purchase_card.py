@@ -125,10 +125,7 @@ class PurchaseCard(QWidget):
             0,
             100_000_000
         )
-        self.total_purchase_price.setSuffix(
-            " ¥"
-        )
-
+        self.total_purchase_price.setSpecialValueText(" ")
         info_layout.addWidget(
             self.total_purchase_price
         )
@@ -142,10 +139,7 @@ class PurchaseCard(QWidget):
             0,
             100_000_000
         )
-        self.total_shipping.setSuffix(
-            " ¥"
-        )
-
+        self.total_shipping.setSpecialValueText(" ")
         info_layout.addWidget(
             self.total_shipping
         )

@@ -71,8 +71,8 @@ class PurchasesJournal(QWidget):
                 purchase_date,
                 "",
                 "",
-                f"{total_price} ¥",
-                f"{total_shipping} ¥",
+                str(total_price),
+                str(total_shipping),
                 "",
             ])
             purchase_item.setData(
@@ -124,8 +124,8 @@ class PurchasesJournal(QWidget):
                     purchase_date,
                     product_text,
                     part_number or "",
-                    f"{allocated_price} ¥",
-                    f"{allocated_shipping} ¥",
+                    str(allocated_price),
+                    str(allocated_shipping),
                     status_names.get(status, status),
                 ])
                 child.setData(

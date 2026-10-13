@@ -212,10 +212,10 @@ class SettingsDialog(QDialog):
             )
 
             shipping_item = QTableWidgetItem(
-                f"{shipping_cost} ₽"
+                str(shipping_cost)
             )
             packaging_item = QTableWidgetItem(
-                f"{packaging_cost} ₽"
+                str(packaging_cost)
             )
 
             self.delivery_table.setItem(
@@ -251,7 +251,7 @@ class SettingsDialog(QDialog):
         shipping_cost, ok = QInputDialog.getInt(
             self,
             "Стоимость доставки",
-            "Стоимость доставки (₽):",
+            "Стоимость доставки :",
             0,
             0,
             100000000
@@ -263,7 +263,7 @@ class SettingsDialog(QDialog):
         packaging_cost, ok = QInputDialog.getInt(
             self,
             "Стоимость упаковки",
-            "Стоимость упаковки (₽):",
+            "Стоимость упаковки :",
             0,
             0,
             100000000

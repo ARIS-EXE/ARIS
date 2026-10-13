@@ -153,8 +153,8 @@ class Dashboard(QWidget):
         frame.setCursor(Qt.CursorShape.PointingHandCursor)
         frame.setProperty("copy_text", "\n".join([
             title,
-            f"Прибыль: {data['profit']} ¥",
-            f"Расходы: {data['expenses']} ¥",
+            f"Прибыль: {data['profit']} ",
+            f"Расходы: {data['expenses']} ",
             f"В продаже: {data['in_stock']} шт.",
             f"Продано: {data['sold']} шт.",
             f"Куплено: {data['purchased']} шт.",
@@ -173,9 +173,11 @@ class Dashboard(QWidget):
         )
         layout.addWidget(title_label)
 
+
         values = [
-            ("Прибыль", f"{data['profit']} ¥"),
-            ("Расходы", f"{data['expenses']} ¥"),
+            ("Прибыль", str(data['profit'])),
+            ("Расходы", str(data['expenses'])),
+
             ("В продаже", f"{data['in_stock']} шт."),
             ("Продано", f"{data['sold']} шт."),
             ("Куплено", f"{data['purchased']} шт."),

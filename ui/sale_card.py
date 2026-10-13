@@ -138,8 +138,8 @@ class SaleCard(QWidget):
 
         # Итоги
         self.total_label = QLabel(
-            "Итого: продажа 0 ¥ | доставка 0 ¥ | "
-            "упаковка 0 ¥ | комиссия 0 ¥ | прибыль 0 ¥"
+            "Итого: продажа 0 | доставка 0 | "
+            "упаковка 0 | комиссия 0 | прибыль 0 "
         )
 
         layout.addWidget(
@@ -422,11 +422,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        sale_price_widget.setSuffix(
-            " ¥"
-        )
-
+        sale_price_widget.setSpecialValueText(" ")
         sale_price_widget.setValue(
             sale_price or 0
         )
@@ -449,11 +445,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        buyer_shipping_widget.setSuffix(
-            " ¥"
-        )
-
+        buyer_shipping_widget.setSpecialValueText(" ")
         buyer_shipping_widget.setValue(
             buyer_shipping or 0
         )
@@ -475,11 +467,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        packaging_widget.setSuffix(
-            " ¥"
-        )
-
+        packaging_widget.setSpecialValueText(" ")
         packaging_widget.setValue(
             packaging or 0
         )
@@ -501,11 +489,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        commission_widget.setSuffix(
-            " ¥"
-        )
-
+        commission_widget.setSpecialValueText(" ")
         commission_widget.setValue(
             commission or 0
         )
@@ -558,7 +542,7 @@ class SaleCard(QWidget):
             row,
             11,
             QTableWidgetItem(
-                f"{profit or 0} ¥"
+                str(profit or 0)
             )
         )
 
@@ -988,11 +972,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        sale_price.setSuffix(
-            " ¥"
-        )
-
+        sale_price.setSpecialValueText(" ")
         self.items_table.setCellWidget(
             row,
             7,
@@ -1034,11 +1014,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        buyer_shipping.setSuffix(
-            " ¥"
-        )
-
+        buyer_shipping.setSpecialValueText(" ")
         buyer_shipping.setValue(
             delivery_shipping or 0
         )
@@ -1055,11 +1031,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        packaging.setSuffix(
-            " ¥"
-        )
-
+        packaging.setSpecialValueText(" ")
         packaging.setValue(
             delivery_packaging or 0
         )
@@ -1081,11 +1053,7 @@ class SaleCard(QWidget):
             0,
             999999999
         )
-
-        commission.setSuffix(
-            " ¥"
-        )
-
+        commission.setSpecialValueText(" ")
         self.items_table.setCellWidget(
             row,
             10,
@@ -1272,7 +1240,7 @@ class SaleCard(QWidget):
             row,
             11,
             QTableWidgetItem(
-                f"{profit} ¥"
+                str(profit)
             )
         )
 
@@ -1688,8 +1656,8 @@ class SaleCard(QWidget):
 
         if self.items_table.rowCount() == 0:
             self.total_label.setText(
-                "Итого: продажа 0 ¥ | доставка 0 ¥ | "
-                "упаковка 0 ¥ | комиссия 0 ¥ | прибыль 0 ¥"
+                "Итого: продажа 0 | доставка 0 | "
+                "упаковка 0 | комиссия 0 | прибыль 0 "
             )
             return
 
@@ -1762,12 +1730,13 @@ class SaleCard(QWidget):
                 )
 
         self.total_label.setText(
-            f"Итого: продажа {total_sale} ¥ | "
-            f"доставка {total_shipping} ¥ | "
-            f"упаковка {total_packaging} ¥ | "
-            f"комиссия {total_commission} ¥ | "
-            f"прибыль {total_profit} ¥"
+            f"Итого: продажа {total_sale} | "
+            f"доставка {total_shipping} | "
+            f"упаковка {total_packaging} | "
+            f"комиссия {total_commission} | "
+            f"прибыль {total_profit} "
         )
+
 
     def _item_number(self, row, column):
         item = self.items_table.item(
@@ -1778,10 +1747,7 @@ class SaleCard(QWidget):
         if item is None:
             return 0
 
-        text = item.text().replace(
-            "¥",
-            ""
-        ).strip()
+        text = item.text().strip()
 
         try:
             return int(text)
