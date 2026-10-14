@@ -521,8 +521,10 @@ class MainWindow(QMainWindow):
 
         if index == 0:
             self.dashboard.refresh()
+        if isinstance(widget, InstanceCard):
+            widget.load_instance()
 
-        if isinstance(widget, Inventory):
+        elif isinstance(widget, Inventory):
             widget.restore_expanded_state()
 
         elif hasattr(widget, "load_purchases"):

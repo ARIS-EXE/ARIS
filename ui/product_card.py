@@ -459,6 +459,7 @@ class ProductCard(QWidget):
         self.add_instance_button.clicked.connect(
             self.add_instance
         )
+
         self.delete_product_button.clicked.connect(
             self.delete_product
         )
@@ -476,13 +477,31 @@ class ProductCard(QWidget):
 
         self.update_commission_suffix()
 
+
         if self.product_id is not None:
             self.load_product()
             self.load_instances()
 
             if self.allow_deleted:
-                self.add_instance_button.setEnabled(False)
-                self.delete_product_button.setEnabled(False)
+                connection = get_connection()
+
+                try:
+                    cursor = connection.execute(
+                        "SELECT deleted FROM products WHERE id = ?",
+                        (self.product_id,)
+                    )
+                    row = cursor.fetchone()
+                finally:
+                    connection.close()
+
+                is_deleted = row is not None and bool(row[0])
+
+                self.add_instance_button.setEnabled(
+                    not is_deleted
+                )
+                self.delete_product_button.setEnabled(
+                    not is_deleted
+                )
         else:
             self.update_image_buttons()
             self.update_delete_button()

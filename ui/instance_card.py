@@ -470,14 +470,7 @@ class InstanceCard(QWidget):
             new_date or ""
         )
 
-        if new_date:
-            self.listed_button.setText(
-                "Снять с продажи"
-            )
-        else:
-            self.listed_button.setText(
-                "В продажу"
-            )
+        self.load_instance()
 
     def update_purchase_cost(self):
         purchase_price = self.purchase_price.value()
