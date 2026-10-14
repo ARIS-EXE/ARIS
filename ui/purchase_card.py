@@ -50,8 +50,34 @@ class PurchaseCard(QWidget):
         # Товары в закупке
         # ============================================================
 
+
+
+        self.total_count_text_label = QLabel(
+            "Общее количество:"
+        )
+        self.total_count_text_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight
+            | Qt.AlignmentFlag.AlignVCenter
+        )
+
+        self.total_count_value_label = QLabel("0")
+        self.total_count_value_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight
+            | Qt.AlignmentFlag.AlignVCenter
+        )
+
+        self.total_count_layout = QHBoxLayout()
+        self.total_count_layout.addWidget(
+            self.total_count_text_label,
+            1
+        )
+        self.total_count_layout.addWidget(
+            self.total_count_value_label
+        )
+
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(2)
+
         self.items_table.installEventFilter(self)
         self.items_table.setHorizontalHeaderLabels([
             "Товар",
@@ -84,7 +110,9 @@ class PurchaseCard(QWidget):
         layout.addWidget(
             self.items_table
         )
-
+        layout.addLayout(
+            self.total_count_layout
+        )
         # ============================================================
         # Основная рабочая область
         # ============================================================
@@ -575,6 +603,7 @@ class PurchaseCard(QWidget):
                     str(current_count + count)
                 )
 
+                self.update_total_count()
                 return
 
         # Если товара ещё нет — добавляем новую строку
@@ -608,7 +637,7 @@ class PurchaseCard(QWidget):
             1,
             count_item
         )
-
+        self.update_total_count()
     def add_instance_to_purchase(self, instance_id):
         from models.instance import get_instance
 
@@ -681,7 +710,7 @@ class PurchaseCard(QWidget):
 
         self.items_table.setItem(row, 0, product_item)
         self.items_table.setItem(row, 1, count_item)
-
+        self.update_total_count()
     def add_existing_instance(self):
         instances = get_unlinked_instances()
 
@@ -785,20 +814,21 @@ class PurchaseCard(QWidget):
 
         self.items_table.setItem(row, 0, product_item)
         self.items_table.setItem(row, 1, count_item)
-    def remove_product(self):
-        row = self.items_table.currentRow()
+        self.update_total_count()
 
-        if row < 0:
-            QMessageBox.warning(
-                self,
-                "Ошибка",
-                "Выберите товар для удаления."
-            )
-            return
+    def update_total_count(self):
+        total = 0
 
-        self.items_table.removeRow(
-            row
-        )
+        for row in range(self.items_table.rowCount()):
+            count_item = self.items_table.item(row, 1)
+
+            if count_item is not None:
+                try:
+                    total += int(count_item.text())
+                except ValueError:
+                    continue
+
+        self.total_count_value_label.setText(str(total))
 
     def show_context_menu(self, position):
         item = self.items_table.itemAt(position)
@@ -893,6 +923,7 @@ class PurchaseCard(QWidget):
             and action == delete_row_action
         ):
             self.items_table.removeRow(row)
+            self.update_total_count()
 
     def load_purchase(self, purchase_id):
         from models.purchase import get_purchases, get_purchase_items
@@ -983,7 +1014,7 @@ class PurchaseCard(QWidget):
 
             self.items_table.setItem(row, 0, product_item)
             self.items_table.setItem(row, 1, count_item)
-
+            self.update_total_count()
         self.purchase_saved = True
 
         self.product_search.clear()
@@ -1005,7 +1036,7 @@ class PurchaseCard(QWidget):
         self.total_shipping.setEnabled(True)
 
         self.save_button.setText("Сохранить изменения")
-
+        self.update_total_count()
         if self.read_only:
             self.set_read_only_mode()
 
