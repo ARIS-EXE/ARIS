@@ -216,9 +216,7 @@ def initialize_database():
         CREATE INDEX IF NOT EXISTS idx_events_instance
             ON events(instance_id);
 
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode_unique
-        ON products(barcode)
-        WHERE barcode IS NOT NULL AND barcode != '';
+        DROP INDEX IF EXISTS idx_products_barcode_unique;
 
 
         CREATE TABLE IF NOT EXISTS delivery_options (

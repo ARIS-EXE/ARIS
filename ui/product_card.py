@@ -1456,6 +1456,78 @@ class ProductCard(QWidget):
             self.buyer_shipping.setValue(0)
 
 
+    def check_duplicates(self):
+        barcode = self.barcode.text().strip()
+        part_number = self.part_number.text().strip()
+
+        connection = get_connection()
+
+        try:
+            if barcode:
+                duplicate = connection.execute(
+                    """
+                    SELECT id, manufacturer, part_number, name
+                    FROM products
+                    WHERE barcode = ?
+                      AND (? IS NULL OR id != ?)
+                    LIMIT 1
+                    """,
+                    (barcode, self.product_id, self.product_id)
+                ).fetchone()
+
+                if duplicate:
+                    answer = QMessageBox.question(
+                        self,
+                        "Возможный дубликат штрихкода",
+                        "У другого товара уже есть такой штрихкод.\n\n"
+                        f"ID: {duplicate[0]}\n"
+                        f"Производитель: {duplicate[1] or '—'}\n"
+                        f"Артикул: {duplicate[2] or '—'}\n"
+                        f"Название: {duplicate[3] or '—'}\n\n"
+                        "Всё равно продолжить сохранение?",
+                        QMessageBox.StandardButton.Yes
+                        | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No
+                    )
+
+                    if answer != QMessageBox.StandardButton.Yes:
+                        return False
+
+            if part_number:
+                duplicate = connection.execute(
+                    """
+                    SELECT id, manufacturer, part_number, name
+                    FROM products
+                    WHERE LOWER(part_number) = LOWER(?)
+                      AND (? IS NULL OR id != ?)
+                    LIMIT 1
+                    """,
+                    (part_number, self.product_id, self.product_id)
+                ).fetchone()
+
+                if duplicate:
+                    answer = QMessageBox.question(
+                        self,
+                        "Возможный дубликат артикула",
+                        "У другого товара уже есть такой артикул.\n\n"
+                        f"ID: {duplicate[0]}\n"
+                        f"Производитель: {duplicate[1] or '—'}\n"
+                        f"Артикул: {duplicate[2] or '—'}\n"
+                        f"Название: {duplicate[3] or '—'}\n\n"
+                        "Всё равно продолжить сохранение?",
+                        QMessageBox.StandardButton.Yes
+                        | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No
+                    )
+
+                    if answer != QMessageBox.StandardButton.Yes:
+                        return False
+
+            return True
+
+        finally:
+            connection.close()
+
     # =============================================================
     # Сохранение
     # =============================================================
@@ -1469,6 +1541,9 @@ class ProductCard(QWidget):
                 "Ошибка",
                 "Введите название товара."
             )
+            return False
+
+        if not self.check_duplicates():
             return False
 
         connection = None
