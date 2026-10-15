@@ -1381,12 +1381,15 @@ class ProductCard(QWidget):
 
         self.category_id = product[4]
 
-        category_path = self.get_category_path(
-            self.category_id
-        )
+        if self.category_id is not None:
+            category_path = self.get_category_path(
+                self.category_id
+            )
+        else:
+            category_path = ""
 
         self.category.setText(
-            category_path
+            category_path or "Выбрать категорию"
         )
 
         self.description.setPlainText(
@@ -1449,7 +1452,6 @@ class ProductCard(QWidget):
         self.load_image_preview()
 
         self.update_image_buttons()
-
 
     def load_delivery_options(self):
         connection = get_connection()
@@ -1777,11 +1779,11 @@ class ProductCard(QWidget):
         if self.save():
             window = self.window()
 
-            if hasattr(window, "tabs"):
+            if hasattr(window, "close_tab"):
                 index = window.tabs.indexOf(self)
 
                 if index >= 0:
-                    window.tabs.removeTab(index)
+                    window.close_tab(index)
                     return
 
             self.close()

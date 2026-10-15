@@ -604,6 +604,7 @@ class PurchaseCard(QWidget):
                 )
 
                 self.update_total_count()
+                self.count.setValue(1)
                 return
 
         # Если товара ещё нет — добавляем новую строку
@@ -638,6 +639,7 @@ class PurchaseCard(QWidget):
             count_item
         )
         self.update_total_count()
+        self.count.setValue(1)
     def add_instance_to_purchase(self, instance_id):
         from models.instance import get_instance
 

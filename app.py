@@ -359,6 +359,14 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(tab_index)
 
     def open_new_product(self):
+        current_widget = self.tabs.currentWidget()
+
+        if current_widget is not None:
+            if current_widget in self.tab_history:
+                self.tab_history.remove(current_widget)
+
+            self.tab_history.append(current_widget)
+
         product_tab = ProductCard()
 
         tab_index = self.tabs.addTab(
@@ -449,21 +457,22 @@ class MainWindow(QMainWindow):
 
         current_widget = self.tabs.widget(index)
 
+        # Удаляем закрываемую вкладку из истории
+        if current_widget in self.tab_history:
+            self.tab_history.remove(current_widget)
+
+        # Находим последнюю открытую вкладку из истории
         previous_widget = None
 
         for widget in reversed(self.tab_history):
-            if widget is current_widget:
-                continue
-
             if self.tabs.indexOf(widget) >= 0:
                 previous_widget = widget
                 break
 
+        # Закрываем вкладку
         self.tabs.removeTab(index)
 
-        if current_widget in self.tab_history:
-            self.tab_history.remove(current_widget)
-
+        # Активируем последнюю вкладку из истории
         if previous_widget is not None:
             previous_index = self.tabs.indexOf(
                 previous_widget
