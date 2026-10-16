@@ -6,12 +6,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QFrame,
+QSizePolicy
 )
 
 from PySide6.QtCharts import (
     QChart,
     QChartView,
     QLineSeries,
+    QValueAxis,
     QCategoryAxis,
 )
 
@@ -75,6 +77,15 @@ class Dashboard(QWidget):
         chart.legend().setVisible(True)
 
         axis_x = QCategoryAxis()
+        axis_x.setGridLineVisible(False)
+        axis_x.setRange(
+            -0.5,
+            len(months_data) - 0.5
+        )
+        axis_x.setStartValue(-0.5)
+        axis_x.setLabelsPosition(
+            QCategoryAxis.AxisLabelsPosition.AxisLabelsPositionOnValue
+        )
 
         for index, month_data in enumerate(months_data):
             label = (
@@ -94,6 +105,26 @@ class Dashboard(QWidget):
 
         expenses_series.attachAxis(axis_x)
         profit_series.attachAxis(axis_x)
+
+        grid_axis = QValueAxis()
+        grid_axis.setRange(
+            -0.5,
+            len(months_data) - 0.5
+        )
+        grid_axis.setTickType(
+            QValueAxis.TickType.TicksDynamic
+        )
+        grid_axis.setTickAnchor(0)
+        grid_axis.setTickInterval(1)
+        grid_axis.setLabelsVisible(False)
+
+        chart.addAxis(
+            grid_axis,
+            Qt.AlignmentFlag.AlignBottom
+        )
+
+        expenses_series.attachAxis(grid_axis)
+        profit_series.attachAxis(grid_axis)
 
         chart_view = QChartView(chart)
         chart_view.setMinimumHeight(300)
@@ -221,7 +252,6 @@ class Dashboard(QWidget):
 
         self.setFocus()
 
-
     def keyPressEvent(self, event):
         if (
             event.key() == Qt.Key.Key_C
@@ -305,6 +335,14 @@ class Dashboard(QWidget):
         chart.legend().setVisible(True)
 
         axis_x = QCategoryAxis()
+        axis_x.setRange(
+            -0.5,
+            len(months_data) - 0.5
+        )
+        axis_x.setStartValue(-0.5)
+        axis_x.setLabelsPosition(
+            QCategoryAxis.AxisLabelsPosition.AxisLabelsPositionOnValue
+        )
 
         for index, month_data in enumerate(months_data):
             label = (
@@ -324,6 +362,27 @@ class Dashboard(QWidget):
 
         expenses_series.attachAxis(axis_x)
         profit_series.attachAxis(axis_x)
+
+        grid_axis = QValueAxis()
+        axis_x.setGridLineVisible(False)
+        grid_axis.setRange(
+            -0.5,
+            len(months_data) - 0.5
+        )
+        grid_axis.setTickType(
+            QValueAxis.TickType.TicksDynamic
+        )
+        grid_axis.setTickAnchor(0)
+        grid_axis.setTickInterval(1)
+        grid_axis.setLabelsVisible(False)
+
+        chart.addAxis(
+            grid_axis,
+            Qt.AlignmentFlag.AlignBottom
+        )
+
+        expenses_series.attachAxis(grid_axis)
+        profit_series.attachAxis(grid_axis)
 
         chart_view = QChartView(chart)
         chart_view.setMinimumHeight(300)
