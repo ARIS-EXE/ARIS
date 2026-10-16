@@ -225,6 +225,10 @@ def initialize_database():
             shipping_cost INTEGER NOT NULL DEFAULT 0,
             packaging_cost INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT ''
+        );
     """)
 
 

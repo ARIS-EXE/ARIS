@@ -300,6 +300,7 @@ def search_instances(search_text):
             """
             SELECT
                 instances.id,
+                instances.product_id,
                 instances.internal_number,
                 products.manufacturer,
                 products.part_number,

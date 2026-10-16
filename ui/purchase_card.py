@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -76,12 +77,14 @@ class PurchaseCard(QWidget):
         )
 
         self.items_table = QTableWidget()
-        self.items_table.setColumnCount(2)
+        self.items_table.setColumnCount(4)
 
         self.items_table.installEventFilter(self)
         self.items_table.setHorizontalHeaderLabels([
             "Товар",
-            "Количество"
+            "Количество",
+            "Себестоимость",
+            "Прибыль"
         ])
 
         self.items_table.horizontalHeader().setSectionResizeMode(
@@ -89,10 +92,12 @@ class PurchaseCard(QWidget):
             QHeaderView.ResizeMode.Stretch
         )
 
-        self.items_table.horizontalHeader().setSectionResizeMode(
-            1,
-            QHeaderView.ResizeMode.ResizeToContents
-        )
+
+        for column in (1, 2, 3):
+            self.items_table.horizontalHeader().setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents
+            )
 
         # Поля таблицы только для просмотра
         self.items_table.setEditTriggers(
@@ -987,6 +992,7 @@ class PurchaseCard(QWidget):
                 allocated_shipping,
                 status,
                 write_off_comment,
+                sale_profit,
             ) = item
 
             row = self.items_table.rowCount()
@@ -1013,10 +1019,53 @@ class PurchaseCard(QWidget):
             )
 
             count_item = QTableWidgetItem("1")
+            cost = (
+                allocated_price or 0
+            ) + (
+                allocated_shipping or 0
+            )
 
+            cost_item = QTableWidgetItem(
+                f"{cost:,.0f}"
+            )
+
+            profit_item = QTableWidgetItem(
+                ""
+                if sale_profit is None
+                else f"{sale_profit:,.0f}"
+            )
+
+            self.items_table.setItem(
+                row,
+                2,
+                cost_item
+            )
+
+            self.items_table.setItem(
+                row,
+                3,
+                profit_item
+            )
             self.items_table.setItem(row, 0, product_item)
             self.items_table.setItem(row, 1, count_item)
             self.update_total_count()
+            if sale_profit is not None:
+                row_color = (
+                    QColor(220, 245, 220)
+                    if sale_profit > 0
+                    else QColor(255, 225, 225)
+                )
+
+                for column in range(
+                    self.items_table.columnCount()
+                ):
+                    item_cell = self.items_table.item(
+                        row,
+                        column
+                    )
+
+                    if item_cell is not None:
+                        item_cell.setBackground(row_color)
         self.purchase_saved = True
 
         self.product_search.clear()
@@ -1139,8 +1188,10 @@ class PurchaseCard(QWidget):
         )
 
         self.purchase_saved = True
+        self.purchase_id = purchase_id
 
-        self.product_search.clear()
+        self.load_purchase(purchase_id)
+        return
         self.product_list.clear()
 
         self.product_image_pixmap = QPixmap()

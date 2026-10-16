@@ -134,7 +134,15 @@ def get_purchase_items(purchase_id):
                 purchase_items.allocated_purchase_price,
                 purchase_items.allocated_shipping,
                 instances.status,
-                write_offs.comment
+                write_offs.comment,
+                (
+                    SELECT sale_items.profit
+                    FROM sale_items
+                    WHERE sale_items.instance_id = instances.id
+                      AND sale_items.active = 1
+                    ORDER BY sale_items.id DESC
+                    LIMIT 1
+                ) AS sale_profit
             FROM purchase_items
             JOIN instances
                 ON instances.id = purchase_items.instance_id
@@ -631,7 +639,6 @@ def create_purchase_multi(
 
     finally:
         connection.close()
-
 
 def update_purchase(
     purchase_id,

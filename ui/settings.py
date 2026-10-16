@@ -1,4 +1,8 @@
-
+from models.commission_formula import (
+    evaluate_formula,
+    FormulaError,
+    VARIABLES,
+)
 import sqlite3
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -14,6 +18,8 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QMessageBox,
+    QLineEdit,
+    QGridLayout,
 )
 
 from app_paths import DB_PATH
@@ -47,10 +53,13 @@ class SettingsDialog(QDialog):
         self.backup_button = QPushButton(
             "Резервное копирование"
         )
-
+        self.commission_formula_button = QPushButton(
+            "Формула комиссии"
+        )
         for button in (
             self.delivery_button,
             self.backup_button,
+            self.commission_formula_button,
         ):
             button.setFixedWidth(190)
             button.setMinimumHeight(36)
@@ -173,22 +182,140 @@ class SettingsDialog(QDialog):
         backup_layout.addWidget(backup_settings_button)
         backup_layout.addStretch()
 
+        # Страница формулы комиссии
+        formula_page = QWidget()
+        formula_layout = QVBoxLayout(formula_page)
+
+        formula_title = QLabel("Формула комиссии")
+        formula_title.setStyleSheet(
+            "font-size: 20px; font-weight: bold;"
+        )
+        formula_layout.addWidget(formula_title)
+
+        formula_layout.addWidget(
+            QLabel(
+                "Соберите формулу кнопками ниже. "
+                "Например, для комиссии 10% от цены продажи: "
+                "Цена продажи × 10 %."
+            )
+        )
+
+        self.commission_formula_input = QLineEdit()
+        self.commission_formula_input.setReadOnly(True)
+        self.commission_formula_input.setPlaceholderText(
+            "Нажимайте кнопки, чтобы собрать формулу"
+        )
+        formula_layout.addWidget(self.commission_formula_input)
+
+        variables_layout = QGridLayout()
+
+        formula_variables = [
+            ("Цена продажи", "sale_price"),
+            ("Цена производителя", "manufacturer_price"),
+            ("Закупочная стоимость", "purchase_price"),
+            ("Доставка при закупке", "purchase_shipping"),
+            ("Расходы на упаковку", "packaging"),
+            ("Доставка покупателю", "buyer_shipping"),
+        ]
+
+        for index, (label, variable) in enumerate(formula_variables):
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda checked=False, value=variable:
+                self.insert_formula_text(value)
+            )
+            variables_layout.addWidget(
+                button,
+                index // 2,
+                index % 2
+            )
+
+        formula_layout.addLayout(variables_layout)
+
+
+        operators_layout = QGridLayout()
+        operators_layout.setSpacing(6)
+
+        operator_buttons = [
+            ("7", "7"),
+            ("8", "8"),
+            ("9", "9"),
+            ("÷", " / "),
+            ("4", "4"),
+            ("5", "5"),
+            ("6", "6"),
+            ("×", " * "),
+            ("1", "1"),
+            ("2", "2"),
+            ("3", "3"),
+            ("−", " - "),
+            (".", "."),
+            ("0", "0"),
+            ("%", " / 100"),
+            ("+", " + "),
+            ("(", "("),
+            (")", ")"),
+        ]
+
+        for index, (label, value) in enumerate(operator_buttons):
+            button = QPushButton(label)
+            button.setMinimumSize(55, 34)
+
+            button.clicked.connect(
+                lambda checked=False, text=value:
+                self.insert_formula_text(text)
+            )
+
+            operators_layout.addWidget(
+                button,
+                index // 4,
+                index % 4
+            )
+
+        formula_layout.addLayout(operators_layout)
+
+
+        formula_actions = QHBoxLayout()
+
+        clear_formula_button = QPushButton("Очистить")
+        clear_formula_button.clicked.connect(
+            self.commission_formula_input.clear
+        )
+
+        save_formula_button = QPushButton("Сохранить формулу")
+        save_formula_button.clicked.connect(
+            self.save_commission_formula
+        )
+
+        formula_actions.addWidget(clear_formula_button)
+        formula_actions.addWidget(save_formula_button)
+
+        formula_layout.addLayout(formula_actions)
+
+        self.formula_example_label = QLabel()
+        self.formula_example_label.setWordWrap(True)
+        formula_layout.addWidget(self.formula_example_label)
+
+        formula_layout.addStretch()
+
         # Добавляем страницы
         self.pages.addWidget(delivery_page)
         self.pages.addWidget(backup_page)
-
+        self.pages.addWidget(formula_page)
         self.delivery_button.clicked.connect(
             lambda: self.pages.setCurrentIndex(0)
         )
         self.backup_button.clicked.connect(
             lambda: self.pages.setCurrentIndex(1)
         )
-
+        self.commission_formula_button.clicked.connect(
+            lambda: self.pages.setCurrentIndex(2)
+        )
         main_layout.addLayout(navigation_layout)
         main_layout.addWidget(self.pages, 1)
 
         self.load_delivery_options()
-
+        self.load_commission_formula()
     def load_delivery_options(self):
         with sqlite3.connect(DB_PATH) as connection:
             rows = connection.execute(
@@ -355,3 +482,179 @@ class SettingsDialog(QDialog):
 
         dialog = BackupSettingsDialog(self)
         dialog.exec()
+
+    def insert_formula_text(self, text):
+        current = self.commission_formula_input.text()
+        self.commission_formula_input.setText(current + text)
+
+    def save_commission_formula(self):
+        from database.database import get_connection
+
+        formula = self.commission_formula_input.text().strip()
+
+        if not formula:
+            QMessageBox.warning(
+                self,
+                "Формула комиссии",
+                "Сначала соберите формулу."
+            )
+            return
+        # Проверяем формулу и наличие только разрешённых переменных.
+        try:
+            test_values = {
+                name: 100
+                for name in VARIABLES
+            }
+            evaluate_formula(formula, test_values)
+
+        except FormulaError as error:
+            QMessageBox.warning(
+                self,
+                "Некорректная формула",
+                str(error)
+            )
+            return
+        connection = get_connection()
+
+        try:
+            connection.execute(
+                """
+                INSERT INTO app_settings (key, value)
+                VALUES ('commission_formula', ?)
+                ON CONFLICT(key)
+                DO UPDATE SET value = excluded.value
+                """,
+                (formula,)
+            )
+            connection.commit()
+        except Exception as error:
+            connection.rollback()
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                f"Не удалось сохранить формулу:\n{error}"
+            )
+            return
+        finally:
+            connection.close()
+        self.load_commission_formula_example()
+        QMessageBox.information(
+            self,
+            "Формула комиссии",
+            "Формула сохранена."
+        )
+
+    def load_commission_formula(self):
+        from database.database import get_connection
+
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                """
+                SELECT value
+                FROM app_settings
+                WHERE key = 'commission_formula'
+                """
+            )
+            row = cursor.fetchone()
+        finally:
+            connection.close()
+
+        formula = row[0] if row else ""
+        self.commission_formula_input.setText(formula)
+
+        self.load_commission_formula_example()
+
+    def load_commission_formula_example(self):
+        from database.database import get_connection
+        from models.commission_formula import (
+            evaluate_formula,
+            FormulaError,
+            VARIABLES,
+        )
+
+        formula = self.commission_formula_input.text().strip()
+
+        if not formula:
+            self.formula_example_label.setText(
+                "Сначала составьте и сохраните формулу."
+            )
+            return
+
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                """
+                SELECT
+                    si.sale_price,
+                    p.manufacturer_price,
+                    i.purchase_price,
+                    i.purchase_shipping,
+                    si.packaging,
+                    si.buyer_shipping,
+                    si.commission,
+                    i.internal_number
+                FROM sale_items si
+                JOIN instances i ON i.id = si.instance_id
+                JOIN products p ON p.id = i.product_id
+                WHERE si.active = 1
+                  AND si.sale_price IS NOT NULL
+                  AND p.manufacturer_price IS NOT NULL
+                  AND i.purchase_price IS NOT NULL
+                  AND i.purchase_shipping IS NOT NULL
+                  AND si.packaging IS NOT NULL
+                  AND si.buyer_shipping IS NOT NULL
+                ORDER BY RANDOM()
+                """
+            )
+            rows = cursor.fetchall()
+        finally:
+            connection.close()
+
+        if not rows:
+            self.formula_example_label.setText(
+                "Нет проданных экземпляров с заполненными данными "
+                "для примера."
+            )
+            return
+
+        variable_values = {
+            "sale_price": 0,
+            "manufacturer_price": 1,
+            "purchase_price": 2,
+            "purchase_shipping": 3,
+            "packaging": 4,
+            "buyer_shipping": 5,
+        }
+
+        for row in rows:
+            values = {
+                name: row[index]
+                for name, index in variable_values.items()
+            }
+
+            try:
+                result = evaluate_formula(formula, values)
+            except FormulaError:
+                continue
+
+            details = [
+                f"{VARIABLES[name]}: {values[name]} ₽"
+                for name in VARIABLES
+                if name in formula
+            ]
+
+            self.formula_example_label.setText(
+                f"Пример для экземпляра №{row[7]}\n"
+                + "\n".join(details)
+                + f"\n\nКомиссия по формуле: {round(result)} ₽"
+                + f"\nСохранённая комиссия: {row[6]} ₽"
+            )
+            return
+
+        self.formula_example_label.setText(
+            "Не удалось рассчитать пример. Проверьте формулу "
+            "и наличие необходимых данных."
+        )

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QMenu
 )
 from database.database import get_connection
-
+from models.commission_formula import evaluate_formula, FormulaError
 class SaleCard(QWidget):
 
     def __init__(self, sale_id=None, edit_mode=False, main_window=None):
@@ -642,7 +642,6 @@ class SaleCard(QWidget):
     ):
         while results_layout.count():
             item = results_layout.takeAt(0)
-
             widget = item.widget()
 
             if widget is not None:
@@ -656,29 +655,31 @@ class SaleCard(QWidget):
 
         for result in results:
             button = QPushButton(
-                f"№{result[1]} | "
-                f"{result[2] or ''} | "
+                f"№{result[2]} | "
                 f"{result[3] or ''} | "
-                f"{result[4]}"
+                f"{result[4] or ''} | "
+                f"{result[5]}"
             )
 
             button.clicked.connect(
                 lambda checked=False,
                 instance_id=result[0],
-                internal_number=result[1],
-                manufacturer=result[2],
-                part_number=result[3],
-                product_name=result[4],
-                barcode=result[5],
-                purchase_price=result[7],
-                purchase_shipping=result[8],
-                default_buyer_shipping=result[9],
-                default_packaging=result[10],
-                default_delivery_option_id=result[11],
-                default_commission_type=result[12],
-                default_commission_value=result[13]:
+                product_id=result[1],
+                internal_number=result[2],
+                manufacturer=result[3],
+                part_number=result[4],
+                product_name=result[5],
+                barcode=result[6],
+                purchase_price=result[8],
+                purchase_shipping=result[9],
+                default_buyer_shipping=result[10],
+                default_packaging=result[11],
+                default_delivery_option_id=result[12],
+                default_commission_type=result[13],
+                default_commission_value=result[14]:
                 self.select_instance(
                     instance_id,
+                    product_id,
                     internal_number,
                     manufacturer,
                     part_number,
@@ -695,9 +696,7 @@ class SaleCard(QWidget):
                 )
             )
 
-            results_layout.addWidget(
-                button
-            )
+            results_layout.addWidget(button)
     def show_item_context_menu(self, position):
         item = self.items_table.itemAt(
             position
@@ -739,32 +738,52 @@ class SaleCard(QWidget):
             )
         )
         if action == open_instance_action:
-            instance_id = self.items_table.item(
+            table_item = self.items_table.item(
                 row,
                 0
-            ).data(
-                Qt.UserRole
             )
+
+            instance_id = None
+
+            if table_item is not None:
+                instance_id = table_item.data(
+                    Qt.UserRole
+                )
 
             if (
                 instance_id is not None
                 and self.main_window is not None
             ):
                 self.main_window.open_instance_card(
-                    instance_id
+                    int(instance_id)
                 )
 
             return
         if action == open_product_action:
+            product_id = None
+
             values = self.existing_item_values.get(row)
 
+            if values is not None:
+                product_id = values.get("product_id")
+
+            if product_id is None:
+                table_item = self.items_table.item(
+                    row,
+                    0
+                )
+
+                if table_item is not None:
+                    product_id = table_item.data(
+                        Qt.UserRole + 1
+                    )
+
             if (
-                values is not None
-                and values.get("product_id") is not None
+                product_id is not None
                 and self.main_window is not None
             ):
                 self.main_window.open_product_card(
-                    values["product_id"]
+                    int(product_id)
                 )
 
             return
@@ -861,6 +880,7 @@ class SaleCard(QWidget):
     def select_instance(
         self,
         instance_id,
+        product_id,
         internal_number,
         manufacturer,
         part_number,
@@ -890,7 +910,40 @@ class SaleCard(QWidget):
 
         self.commission_manual = False
         self.selected_instance_id = instance_id
+        from database.database import get_connection
 
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                """
+                SELECT manufacturer_price
+                FROM products
+                WHERE id = ?
+                """,
+                (product_id,)
+            )
+            product_data = cursor.fetchone()
+
+            cursor = connection.execute(
+                """
+                SELECT value
+                FROM app_settings
+                WHERE key = 'commission_formula'
+                """
+            )
+            formula_data = cursor.fetchone()
+        finally:
+            connection.close()
+
+        manufacturer_price = (
+            product_data[0]
+            if product_data and product_data[0] not in (None, 0)
+            else None
+        )
+        commission_formula = (
+            formula_data[0] if formula_data else ""
+        )
         row = self.items_table.rowCount()
 
         self.items_table.insertRow(
@@ -916,6 +969,14 @@ class SaleCard(QWidget):
         ).setData(
             Qt.UserRole,
             instance_id
+        )
+
+        self.items_table.item(
+            row,
+            0
+        ).setData(
+            Qt.UserRole + 1,
+            product_id
         )
 
         self.items_table.setItem(
@@ -1068,23 +1129,79 @@ class SaleCard(QWidget):
             )
         )
 
+
+
+        commission.setProperty("warning_shown", False)
+
         def update_commission(value):
+
             if commission.property("manual"):
                 return
 
-            commission.setValue(
-                round(
-                    value * default_commission_value / 100
-                )
-                if default_commission_type == "percent"
-                else int(
-                    default_commission_value or 0
-                )
-            )
+            # Пока цена продажи не введена — не рассчитываем комиссию.
+            if value <= 0:
+                commission.clear()
+                return
 
-        sale_price.valueChanged.connect(
-            update_commission
-        )
+            if default_commission_type == "percent":
+                result = (
+                    value * (default_commission_value or 0) / 100
+                )
+
+            elif default_commission_type == "fixed":
+                result = default_commission_value or 0
+
+            elif default_commission_type == "formula":
+                if not commission_formula:
+                    commission.clear()
+
+                    if not commission.property("warning_shown"):
+                        commission.setProperty("warning_shown", True)
+                        QMessageBox.warning(
+                            self,
+                            "Комиссия",
+                            "Глобальная формула комиссии не задана. "
+                            "Введите комиссию вручную."
+                        )
+                    return
+
+                values = {
+                    "sale_price": value,
+                    "manufacturer_price": manufacturer_price,
+                    "purchase_price": purchase_price,
+                    "purchase_shipping": purchase_shipping,
+                    "packaging": packaging.value(),
+                    "buyer_shipping": buyer_shipping.value(),
+                }
+                try:
+                    result = evaluate_formula(
+                        commission_formula,
+                        values
+                    )
+
+                except FormulaError as error:
+                    commission.clear()
+
+                    if not commission.property("warning_shown"):
+                        commission.setProperty("warning_shown", True)
+                        QMessageBox.warning(
+                            self,
+                            "Ошибка расчёта комиссии",
+                            f"Формула: {commission_formula}\n\n"
+                            f"Причина: {error}\n\n"
+                            "Введите комиссию вручную."
+                        )
+                    return
+
+            else:
+                commission.clear()
+                return
+
+            commission.setValue(max(0, round(result)))
+
+        sale_price.valueChanged.connect(update_commission)
+
+        sale_price.valueChanged.connect(update_commission)
 
         commission.editingFinished.connect(
             lambda: commission.setProperty(

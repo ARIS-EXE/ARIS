@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -89,6 +90,22 @@ class PurchasesJournal(QWidget):
 
             items = get_purchase_items(purchase_id)
 
+            total_profit = sum(
+                item[11] or 0
+                for item in items
+            )
+
+            total_cost = total_price + total_shipping
+
+            if total_profit > total_cost:
+                green = QBrush(QColor(220, 245, 220))
+
+                for column in range(self.tree.columnCount()):
+                    purchase_item.setBackground(
+                        column,
+                        green
+                    )
+
             status_names = {
                 "in_stock": "На складе",
                 "sold": "Продан",
@@ -108,6 +125,7 @@ class PurchasesJournal(QWidget):
                     allocated_shipping,
                     status,
                     write_off_comment,
+                    sale_profit,
                 ) = item
 
                 product_text = " | ".join(

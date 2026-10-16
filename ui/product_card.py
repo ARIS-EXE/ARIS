@@ -183,13 +183,30 @@ class ProductCard(QWidget):
             "fixed"
         )
 
+        self.commission_type.addItem(
+            "Формула",
+            "formula"
+        )
+
         self.commission_type.currentIndexChanged.connect(
             self.update_commission_suffix
         )
+
         self.commission_value = QDoubleSpinBox()
         self.commission_value.setDecimals(2)
-        self.commission_value.setRange(0, 100)
-        self.commission_value.setSuffix(" %")
+        self.commission_value.setRange(0, 10_000_000)
+
+        commission_layout = QHBoxLayout()
+        commission_layout.setContentsMargins(0, 0, 0, 0)
+        commission_layout.setSpacing(5)
+
+        commission_layout.addWidget(
+            self.commission_type
+        )
+
+        commission_layout.addWidget(
+            self.commission_value
+        )
 
         commission_layout = QHBoxLayout()
         commission_layout.setContentsMargins(0, 0, 0, 0)
@@ -902,17 +919,26 @@ class ProductCard(QWidget):
         commission_type = self.commission_type.currentData()
 
         if commission_type == "fixed":
+            self.commission_value.setEnabled(True)
             self.commission_value.setDecimals(0)
-            self.commission_value.setMinimum(0)
+            self.commission_value.setRange(0, 100_000_000)
             self.commission_value.setSpecialValueText(" ")
-            self.commission_value.setMaximum(100_000_000)
+            self.commission_value.setSuffix("")
 
-        else:
+        elif commission_type == "percent":
+            self.commission_value.setEnabled(True)
             self.commission_value.setDecimals(2)
-            self.commission_value.setMinimum(0)
+            self.commission_value.setRange(0, 100)
             self.commission_value.setSpecialValueText(" ")
-            self.commission_value.setMaximum(100)
             self.commission_value.setSuffix(" %")
+
+        elif commission_type == "formula":
+            self.commission_value.setValue(0)
+            self.commission_value.setEnabled(False)
+            self.commission_value.setDecimals(2)
+            self.commission_value.setRange(0, 100)
+            self.commission_value.setSpecialValueText(" ")
+            self.commission_value.setSuffix("")
 
     # =============================================================
     # Экземпляры
