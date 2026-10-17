@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("RC Inventory - Управление товарами, закупками и продажами")
+        self.setWindowTitle("ARIS - Управление товарами, закупками и продажами")
 
         try:
             create_automatic_backup()
@@ -496,6 +496,14 @@ class MainWindow(QMainWindow):
             "Склад",
             lambda: Inventory(self)
         )
+    def open_inventory_by_category(self, category_id):
+        self.open_inventory()
+
+        widget = self.tabs.currentWidget()
+
+        if isinstance(widget, Inventory):
+            widget.category_filter_id = category_id
+            widget.load_products()
     def open_categories(self):
         self.open_section(
             "Категории",

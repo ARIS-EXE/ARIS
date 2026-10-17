@@ -1,5 +1,5 @@
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QPixmap, QPainter
+from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -350,6 +350,29 @@ class Inventory(QWidget):
         )
 
         main_layout.addWidget(self.tree)
+        # Сохранение ширины столбцов склада
+        self.header_settings = QSettings(
+            "ARIS",
+            "Inventory"
+        )
+
+        header_state = self.header_settings.value(
+            "tree_header_state"
+        )
+
+        if header_state is not None:
+            self.tree.header().restoreState(
+                header_state
+            )
+
+        self.tree.header().sectionResized.connect(
+            self.save_header_state
+        )
+    def save_header_state(self, *args):
+        self.header_settings.setValue(
+            "tree_header_state",
+            self.tree.header().saveState()
+        )
     def on_tree_double_click(self, item, column):
         if item.parent() is not None:
             return
@@ -419,11 +442,40 @@ class Inventory(QWidget):
     def load_products(self):
         search_text = self.search.text().strip()
 
+        category_id = getattr(
+            self,
+            "category_filter_id",
+            None
+        )
+
         connection = get_connection()
 
         try:
             conditions = ["products.deleted = 0"]
             parameters = []
+
+            if category_id is not None:
+                conditions.append(
+                    """
+                    products.category_id IN (
+                        WITH RECURSIVE category_tree(id) AS (
+                            SELECT id
+                            FROM categories
+                            WHERE id = ?
+
+                            UNION ALL
+
+                            SELECT categories.id
+                            FROM categories
+                            JOIN category_tree
+                                ON categories.parent_id = category_tree.id
+                        )
+                        SELECT id
+                        FROM category_tree
+                    )
+                    """
+                )
+                parameters.append(category_id)
 
             if search_text:
                 search_words = search_text.split()
@@ -734,17 +786,28 @@ class Inventory(QWidget):
                 product_id
             )
             if status == "Продан":
+                light_green = QColor("#DDF0DD")
+
                 for column in range(6):
                     instance_item.setBackground(
                         column,
-                        Qt.GlobalColor.lightGray
+                        light_green
                     )
 
             elif status == "Списан":
-                for column in range(5):
+                for column in range(6):
                     instance_item.setBackground(
                         column,
-                        Qt.GlobalColor.red
+                        QColor("#E6A0A0")
+                    )
+
+            elif instance[11]:
+                light_yellow = QColor("#FFF2CC")
+
+                for column in range(6):
+                    instance_item.setBackground(
+                        column,
+                        light_yellow
                     )
 
             product_item.addChild(

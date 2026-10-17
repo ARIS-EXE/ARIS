@@ -134,6 +134,7 @@ def get_purchase_items(purchase_id):
                 purchase_items.allocated_purchase_price,
                 purchase_items.allocated_shipping,
                 instances.status,
+                instances.listed_date,
                 write_offs.comment,
                 (
                     SELECT sale_items.profit

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QWidget,
@@ -45,8 +45,32 @@ class PurchasesJournal(QWidget):
 
         layout.addWidget(self.tree)
         self.tree.setColumnHidden(7, True)
-        self.load_purchases()
 
+        # Сохранение ширины столбцов журнала закупок
+        self.header_settings = QSettings(
+            "ARIS",
+            "PurchasesJournal"
+        )
+
+        header_state = self.header_settings.value(
+            "tree_header_state"
+        )
+
+        if header_state is not None:
+            self.tree.header().restoreState(
+                header_state
+            )
+
+        self.tree.header().sectionResized.connect(
+            self.save_header_state
+        )
+
+        self.load_purchases()
+    def save_header_state(self, *args):
+        self.header_settings.setValue(
+            "tree_header_state",
+            self.tree.header().saveState()
+        )
     def load_purchases(self):
         expanded_numbers = set()
 
@@ -91,7 +115,7 @@ class PurchasesJournal(QWidget):
             items = get_purchase_items(purchase_id)
 
             total_profit = sum(
-                item[11] or 0
+                item[12] or 0
                 for item in items
             )
 
@@ -124,6 +148,7 @@ class PurchasesJournal(QWidget):
                     allocated_price,
                     allocated_shipping,
                     status,
+                    listed_date,
                     write_off_comment,
                     sale_profit,
                 ) = item
@@ -146,6 +171,23 @@ class PurchasesJournal(QWidget):
                     str(allocated_shipping),
                     status_names.get(status, status),
                 ])
+                if status == "sold":
+                    light_green = QBrush(QColor("#DDF0DD"))
+
+                    for column in range(self.tree.columnCount()):
+                        child.setBackground(column, light_green)
+
+                elif status == "written_off":
+                    light_red = QBrush(QColor("#E6A0A0"))
+
+                    for column in range(self.tree.columnCount()):
+                        child.setBackground(column, light_red)
+
+                elif listed_date:
+                    yellow = QBrush(QColor("#FFF2CC"))
+
+                    for column in range(self.tree.columnCount()):
+                        child.setBackground(column, yellow)
                 child.setData(
                     0,
                     Qt.ItemDataRole.UserRole + 1,

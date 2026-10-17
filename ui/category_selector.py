@@ -23,7 +23,9 @@ class CategorySelector(QDialog):
 
         self.tree = QTreeWidget()
         self.tree.setHeaderLabel("Категории")
-
+        self.tree.itemDoubleClicked.connect(
+            self.select_category
+        )
         layout.addWidget(self.tree)
 
         select_button = QPushButton("Выбрать")

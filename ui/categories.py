@@ -220,7 +220,9 @@ class Categories(QWidget):
         delete_action = menu.addAction(
             "Удалить"
         )
-
+        view_products_action = menu.addAction(
+            "Просмотреть список товаров"
+        )
         action = menu.exec(
             self.tree.viewport().mapToGlobal(position)
         )
@@ -233,6 +235,12 @@ class Categories(QWidget):
 
         elif action == delete_action:
             self.delete_category(item)
+        elif action == view_products_action:
+            category_id = item.data(0, 1000)
+
+            self.window().open_inventory_by_category(
+                category_id
+            )
     def add_category(self):
         name = self.name_input.text().strip()
 

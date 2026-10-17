@@ -4,7 +4,7 @@ import shutil
 import subprocess
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -141,7 +141,20 @@ class ProductCard(QWidget):
         form.addRow("ID товара:", self.product_id_label)
         form.addRow("Штрихкод:", self.barcode)
         form.addRow("Производитель:", self.manufacturer)
-        form.addRow("Артикул:", self.part_number)
+        self.copy_product_data_button = QPushButton(
+            "Копировать данные товара"
+        )
+        self.copy_product_data_button.setFixedSize(190, 32)
+        self.copy_product_data_button.clicked.connect(
+            self.copy_product_data
+        )
+        part_number_layout = QHBoxLayout()
+        part_number_layout.addWidget(self.part_number)
+        part_number_layout.addWidget(
+            self.copy_product_data_button
+        )
+
+        form.addRow("Артикул:", part_number_layout)
         form.addRow("Название:", self.name)
         form.addRow("Категория:", self.category)
 
@@ -280,6 +293,22 @@ class ProductCard(QWidget):
             sale_columns
         )
 
+
+        # Описание
+        left_layout.addWidget(QLabel("Описание:"))
+
+        self.description = QTextEdit()
+        self.description.setFixedHeight(65)
+        left_layout.addWidget(self.description)
+
+        # Заметки
+        left_layout.addWidget(QLabel("Заметки:"))
+
+        self.notes = QTextEdit()
+        self.notes.setFixedHeight(55)
+        left_layout.addWidget(self.notes)
+
+
         # ---------------------------------------------------------
         # Правая часть — изображение
         # ---------------------------------------------------------
@@ -293,8 +322,8 @@ class ProductCard(QWidget):
         self.image_label = QLabel()
 
         self.image_label.setFixedSize(
-            200,
-            200
+            350,
+            350
         )
 
         self.image_label.setAlignment(
@@ -365,20 +394,6 @@ class ProductCard(QWidget):
         main_layout.addLayout(
             top_layout
         )
-
-        # Описание
-        main_layout.addWidget(QLabel("Описание:"))
-
-        self.description = QTextEdit()
-        self.description.setMaximumHeight(110)
-        main_layout.addWidget(self.description)
-
-        # Заметки
-        main_layout.addWidget(QLabel("Заметки:"))
-
-        self.notes = QTextEdit()
-        self.notes.setMaximumHeight(90)
-        main_layout.addWidget(self.notes)
 
         # =========================================================
         # Экземпляры
@@ -522,7 +537,16 @@ class ProductCard(QWidget):
         else:
             self.update_image_buttons()
             self.update_delete_button()
+    def copy_product_data(self):
+        from PySide6.QtWidgets import QApplication
 
+        text = "\n".join([
+            self.manufacturer.text().strip(),
+            self.part_number.text().strip(),
+            self.name.text().strip()
+        ])
+
+        QApplication.clipboard().setText(text)
     # =============================================================
     # Категория
     # =============================================================
@@ -1186,7 +1210,14 @@ class ProductCard(QWidget):
             )
 
             item = QListWidgetItem(text)
+            if instance[7] == "sold":
+                item.setBackground(QColor("#DDF0DD"))
 
+            elif instance[7] == "written_off":
+                item.setBackground(QColor("#E6A0A0"))
+
+            elif instance[7] == "in_stock" and instance[11]:
+                item.setBackground(QColor("#FFF2CC"))
             item.setData(
                 Qt.ItemDataRole.UserRole,
                 instance[0]

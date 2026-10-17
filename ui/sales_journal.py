@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -116,9 +116,57 @@ class SalesJournal(QWidget):
             layout
         )
 
+        # Сохранение ширины столбцов журнала продаж
+        self.sales_header_settings = QSettings(
+            "ARIS",
+            "SalesJournal"
+        )
+
+        sales_header_state = self.sales_header_settings.value(
+            "sales_header_state"
+        )
+
+        if sales_header_state is not None:
+            self.sales_table.header().restoreState(
+                sales_header_state
+            )
+
+        self.sales_table.header().sectionResized.connect(
+            self.save_sales_header_state
+        )
+
+        # Сохранение ширины столбцов возвратов
+        self.returns_header_settings = QSettings(
+            "ARIS",
+            "SalesJournal"
+        )
+
+        returns_header_state = self.returns_header_settings.value(
+            "returns_header_state"
+        )
+
+        if returns_header_state is not None:
+            self.returns_table.header().restoreState(
+                returns_header_state
+            )
+
+        self.returns_table.header().sectionResized.connect(
+            self.save_returns_header_state
+        )
+
         self.load_sales()
         self.load_returns()
+    def save_sales_header_state(self, *args):
+        self.sales_header_settings.setValue(
+            "sales_header_state",
+            self.sales_table.header().saveState()
+        )
 
+    def save_returns_header_state(self, *args):
+        self.returns_header_settings.setValue(
+            "returns_header_state",
+            self.returns_table.header().saveState()
+        )
     def save_expanded_state(self):
         self.expanded_sales.clear()
 

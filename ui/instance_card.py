@@ -14,11 +14,52 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QListWidget,
     QListWidgetItem,
+    QDateEdit,
+    QCalendarWidget,
 )
 
 from database.database import get_connection
+class NullableDateEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
+        self.setReadOnly(True)
+        self.setPlaceholderText("Выберите дату")
+        self.calendar = QCalendarWidget(self)
+        self.calendar.setWindowFlags(
+            Qt.Popup
+        )
 
+        self.calendar.clicked.connect(
+            self.set_selected_date
+        )
+
+    def set_selected_date(self, date):
+        self.setText(
+            date.toString("yyyy-MM-dd")
+        )
+        self.calendar.hide()
+
+    def mousePressEvent(self, event):
+        self.calendar.setSelectedDate(
+            QDate.currentDate()
+        ) if not self.text() else None
+
+        self.calendar.move(
+            self.mapToGlobal(self.rect().bottomLeft())
+        )
+        self.calendar.show()
+
+    def setDate(self, date):
+        self.setText(
+            "" if not date.isValid()
+            else date.toString("yyyy-MM-dd")
+        )
+
+    def date(self):
+        return QDate.fromString(
+            self.text(), "yyyy-MM-dd"
+        )
 class InstanceCard(QWidget):
     def __init__(self, instance_id):
         super().__init__()
@@ -73,8 +114,12 @@ class InstanceCard(QWidget):
         self.update_purchase_cost()
 
         self.purchase_date = QLineEdit()
-        self.listed_date = QLineEdit()
-        self.listed_date.setReadOnly(False)
+        self.listed_date = NullableDateEdit()
+
+        form_layout.addRow(
+            "Дата выставления:",
+            self.listed_date
+        )
         self.status = QLineEdit()
         self.status.setReadOnly(True)
         self.listed_button = QPushButton("В продажу")
@@ -157,16 +202,12 @@ class InstanceCard(QWidget):
             QListWidget.SingleSelection
         )
 
-        self.history_list.setMinimumHeight(
-            120
-        )
-
-        self.history_list.setMaximumHeight(
-            180
-        )
+        self.history_list.setMinimumHeight(120)
+        self.history_list.setMaximumHeight(16777215)
 
         main_layout.addWidget(
-            self.history_list
+            self.history_list,
+            1
         )
 
         buttons_layout = QHBoxLayout()
@@ -264,9 +305,14 @@ class InstanceCard(QWidget):
         self.purchase_date.setText(
             instance[5] or ""
         )
-        self.listed_date.setText(
-            instance[7] or ""
-        )
+        listed_date = instance[7]
+
+        if listed_date:
+            self.listed_date.setDate(
+                QDate.fromString(listed_date, "yyyy-MM-dd")
+            )
+        else:
+            self.listed_date.clear()
 
         if instance[7]:
             self.listed_button.setText(
@@ -329,6 +375,7 @@ class InstanceCard(QWidget):
             return True
 
         return super().eventFilter(obj, event)
+
     def save(self):
         from database.database import get_connection
 
@@ -336,11 +383,34 @@ class InstanceCard(QWidget):
         purchase_price = self.purchase_price.value()
         purchase_shipping = self.purchase_shipping.value()
         purchase_date = self.purchase_date.text().strip()
+        listed_date = self.listed_date.text().strip()
         notes = self.notes.text().strip()
 
         connection = get_connection()
 
         try:
+            # Проверяем, выставлен ли экземпляр на продажу сейчас
+            current = connection.execute(
+                """
+                SELECT listed_date
+                FROM instances
+                WHERE id = ?
+                """,
+                (self.instance_id,)
+            ).fetchone()
+
+            if current is None:
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Экземпляр не найден."
+                )
+                return
+
+            # Если экземпляр снят с продажи, не сохраняем новую дату
+            if not current[0]:
+                listed_date = ""
+
             connection.execute(
                 """
                 UPDATE instances
@@ -349,6 +419,7 @@ class InstanceCard(QWidget):
                     purchase_price = ?,
                     purchase_shipping = ?,
                     purchase_date = ?,
+                    listed_date = ?,
                     notes = ?
                 WHERE id = ?
                 """,
@@ -357,10 +428,48 @@ class InstanceCard(QWidget):
                     purchase_price,
                     purchase_shipping,
                     purchase_date,
+                    listed_date or None,
                     notes,
                     self.instance_id
                 )
             )
+
+            # Меняем дату существующего события, не создавая повторных
+            if listed_date:
+                cursor = connection.execute(
+                    """
+                    UPDATE events
+                    SET event_date = ?
+                    WHERE id = (
+                        SELECT id
+                        FROM events
+                        WHERE instance_id = ?
+                          AND event_type = 'listed'
+                        ORDER BY id DESC
+                        LIMIT 1
+                    )
+                    """,
+                    (listed_date, self.instance_id)
+                )
+
+                if cursor.rowcount == 0:
+                    connection.execute(
+                        """
+                        INSERT INTO events (
+                            event_date,
+                            event_type,
+                            instance_id,
+                            product_id
+                        )
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            listed_date,
+                            "listed",
+                            self.instance_id,
+                            self.product_id
+                        )
+                    )
 
             connection.commit()
 
@@ -376,6 +485,9 @@ class InstanceCard(QWidget):
 
         finally:
             connection.close()
+
+        self.load_instance()
+        self.load_history()
 
         QMessageBox.information(
             self,
@@ -466,9 +578,12 @@ class InstanceCard(QWidget):
         finally:
             connection.close()
 
-        self.listed_date.setText(
-            new_date or ""
-        )
+        if new_date:
+            self.listed_date.setDate(
+                QDate.fromString(new_date, "yyyy-MM-dd")
+            )
+        else:
+            self.listed_date.clear()
 
         self.load_instance()
 

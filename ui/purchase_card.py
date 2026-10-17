@@ -991,6 +991,7 @@ class PurchaseCard(QWidget):
                 allocated_price,
                 allocated_shipping,
                 status,
+                listed_date,
                 write_off_comment,
                 sale_profit,
             ) = item
@@ -1066,6 +1067,14 @@ class PurchaseCard(QWidget):
 
                     if item_cell is not None:
                         item_cell.setBackground(row_color)
+            if status == "in_stock" and listed_date:
+                yellow = QColor("#FFF2CC")
+
+                for column in range(self.items_table.columnCount()):
+                    item_cell = self.items_table.item(row, column)
+
+                    if item_cell is not None:
+                        item_cell.setBackground(yellow)
         self.purchase_saved = True
 
         self.product_search.clear()

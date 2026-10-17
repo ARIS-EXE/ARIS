@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -122,10 +122,57 @@ class Trash(QWidget):
 
         self.layout.addWidget(splitter)
 
+        # Сохранение ширины столбцов удалённых товаров
+        self.products_header_settings = QSettings(
+            "ARIS",
+            "Trash"
+        )
+
+        products_header_state = self.products_header_settings.value(
+            "products_header_state"
+        )
+
+        if products_header_state is not None:
+            self.product_list.header().restoreState(
+                products_header_state
+            )
+
+        self.product_list.header().sectionResized.connect(
+            self.save_products_header_state
+        )
+
+        # Сохранение ширины столбцов списанных экземпляров
+        self.written_off_header_settings = QSettings(
+            "ARIS",
+            "Trash"
+        )
+
+        written_off_header_state = self.written_off_header_settings.value(
+            "written_off_header_state"
+        )
+
+        if written_off_header_state is not None:
+            self.written_off_list.header().restoreState(
+                written_off_header_state
+            )
+
+        self.written_off_list.header().sectionResized.connect(
+            self.save_written_off_header_state
+        )
+
         self.load_products()
         self.load_written_offs()
+    def save_products_header_state(self, *args):
+        self.products_header_settings.setValue(
+            "products_header_state",
+            self.product_list.header().saveState()
+        )
 
-
+    def save_written_off_header_state(self, *args):
+        self.written_off_header_settings.setValue(
+            "written_off_header_state",
+            self.written_off_list.header().saveState()
+        )
     def eventFilter(self, obj, event):
         if (
             obj in (
