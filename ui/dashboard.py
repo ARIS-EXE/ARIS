@@ -126,6 +126,38 @@ class Dashboard(QWidget):
         expenses_series.attachAxis(grid_axis)
         profit_series.attachAxis(grid_axis)
 
+        # Вертикальная ось сумм
+        axis_y = QValueAxis()
+
+        all_values = [
+            month_data[key]
+            for month_data in months_data
+            for key in ("expenses", "profit")
+        ]
+
+        min_value = min(0, min(all_values))
+        max_value = max(0, max(all_values))
+
+        padding = max(
+            (max_value - min_value) * 0.1,
+            1
+        )
+
+        axis_y.setRange(
+            min_value - padding,
+            max_value + padding
+        )
+        axis_y.setLabelFormat("%.0f")
+        axis_y.setTickCount(6)
+
+        chart.addAxis(
+            axis_y,
+            Qt.AlignmentFlag.AlignLeft
+        )
+
+        expenses_series.attachAxis(axis_y)
+        profit_series.attachAxis(axis_y)
+
         chart_view = QChartView(chart)
         chart_view.setMinimumHeight(300)
 
@@ -429,7 +461,6 @@ class Dashboard(QWidget):
         profit_series.attachAxis(axis_x)
 
         grid_axis = QValueAxis()
-        axis_x.setGridLineVisible(False)
         grid_axis.setRange(
             -0.5,
             len(months_data) - 0.5
@@ -448,6 +479,38 @@ class Dashboard(QWidget):
 
         expenses_series.attachAxis(grid_axis)
         profit_series.attachAxis(grid_axis)
+
+        # Общая вертикальная ось сумм
+        axis_y = QValueAxis()
+
+        all_values = [
+            month_data[key]
+            for month_data in months_data
+            for key in ("expenses", "profit")
+        ]
+
+        min_value = min(0, min(all_values))
+        max_value = max(0, max(all_values))
+
+        padding = max(
+            (max_value - min_value) * 0.1,
+            1
+        )
+
+        axis_y.setRange(
+            min_value - padding,
+            max_value + padding
+        )
+        axis_y.setLabelFormat("%.0f")
+        axis_y.setTickCount(6)
+
+        chart.addAxis(
+            axis_y,
+            Qt.AlignmentFlag.AlignLeft
+        )
+
+        expenses_series.attachAxis(axis_y)
+        profit_series.attachAxis(axis_y)
 
         chart_view = QChartView(chart)
         chart_view.setMinimumHeight(300)
