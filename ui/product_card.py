@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from database.database import get_connection
 from ui.category_selector import CategorySelector
-
+from ui.product_statistics import ProductStatisticsDialog
 
 from app_paths import IMAGE_DIR
 
@@ -436,6 +436,9 @@ class ProductCard(QWidget):
         self.add_instance_button = QPushButton(
             "+ Добавить экземпляр"
         )
+        self.statistics_button = QPushButton(
+            "Статистика товара"
+        )
         self.delete_product_button = QPushButton(
             "Удалить товар"
         )
@@ -455,6 +458,10 @@ class ProductCard(QWidget):
 
         buttons_layout.addWidget(
             self.add_instance_button
+        )
+
+        buttons_layout.addWidget(
+            self.statistics_button
         )
 
         buttons_layout.addWidget(
@@ -490,6 +497,10 @@ class ProductCard(QWidget):
 
         self.add_instance_button.clicked.connect(
             self.add_instance
+        )
+
+        self.statistics_button.clicked.connect(
+            self.show_statistics
         )
 
         self.delete_product_button.clicked.connect(
@@ -936,7 +947,7 @@ class ProductCard(QWidget):
             )
 
     # =============================================================
-    # Комиссия Yahoo
+    # Комиссия площадки
     # =============================================================
 
     def update_commission_suffix(self):
@@ -1844,3 +1855,17 @@ class ProductCard(QWidget):
                     return
 
             self.close()
+    def show_statistics(self):
+        if self.product_id is None:
+            QMessageBox.information(
+                self,
+                "Статистика товара",
+                "Сначала сохраните товар."
+            )
+            return
+
+        dialog = ProductStatisticsDialog(
+            self.product_id,
+            self
+        )
+        dialog.exec()
