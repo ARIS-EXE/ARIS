@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from database.database import get_connection
 
@@ -165,7 +165,100 @@ def get_month_data(year, month):
 
     finally:
         connection.close()
+def get_day_data(day):
+    start_date = day.isoformat()
+    end_date = (day + timedelta(days=1)).isoformat()
 
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            """
+            SELECT COALESCE(SUM(sale_items.profit), 0)
+            FROM sale_items
+            JOIN sales ON sales.id = sale_items.sale_id
+            WHERE sales.sale_date >= ?
+              AND sales.sale_date < ?
+              AND sale_items.active = 1
+            """,
+            (start_date, end_date)
+        )
+        profit = cursor.fetchone()[0]
+
+        cursor = connection.execute(
+            """
+            SELECT
+                COALESCE(SUM(total_purchase_price), 0),
+                COALESCE(SUM(total_shipping), 0)
+            FROM purchases
+            WHERE purchase_date >= ?
+              AND purchase_date < ?
+            """,
+            (start_date, end_date)
+        )
+        purchase_price, purchase_shipping = cursor.fetchone()
+        expenses = purchase_price + purchase_shipping
+
+        cursor = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM purchase_items
+            JOIN purchases
+                ON purchases.id = purchase_items.purchase_id
+            WHERE purchases.purchase_date >= ?
+              AND purchases.purchase_date < ?
+            """,
+            (start_date, end_date)
+        )
+        purchased = cursor.fetchone()[0]
+
+        cursor = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM sale_items
+            JOIN sales ON sales.id = sale_items.sale_id
+            WHERE sales.sale_date >= ?
+              AND sales.sale_date < ?
+              AND sale_items.active = 1
+            """,
+            (start_date, end_date)
+        )
+        sold = cursor.fetchone()[0]
+
+        cursor = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM returns
+            WHERE return_date >= ?
+              AND return_date < ?
+            """,
+            (start_date, end_date)
+        )
+        returned = cursor.fetchone()[0]
+
+        cursor = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM instances
+            WHERE listed_date >= ?
+              AND listed_date < ?
+              AND deleted = 0
+            """,
+            (start_date, end_date)
+        )
+        in_stock = cursor.fetchone()[0]
+
+        return {
+            "profit": profit,
+            "expenses": expenses,
+            "in_stock": in_stock,
+            "sold": sold,
+            "purchased": purchased,
+            "returned": returned,
+        }
+
+    finally:
+        connection.close()
 
 def get_dashboard_months():
     today = date.today()
@@ -180,7 +273,8 @@ def get_dashboard_months():
             year,
             month
         )
-
+        if year == today.year and month == today.month:
+            data["today"] = get_day_data(today)
         months.append({
             "year": year,
             "month": month,
@@ -190,6 +284,7 @@ def get_dashboard_months():
             "sold": data["sold"],
             "purchased": data["purchased"],
             "returned": data["returned"],
+            "today": data.get("today"),
         })
 
         month -= 1

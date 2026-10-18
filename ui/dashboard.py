@@ -182,15 +182,32 @@ class Dashboard(QWidget):
         frame = QFrame()
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         frame.setCursor(Qt.CursorShape.PointingHandCursor)
-        frame.setProperty("copy_text", "\n".join([
+
+        copy_lines = [
             title,
-            f"Прибыль: {data['profit']} ",
-            f"Расходы: {data['expenses']} ",
+            f"Прибыль: {data['profit']}",
+            f"Расходы: {data['expenses']}",
             f"В продаже: {data['in_stock']} шт.",
             f"Продано: {data['sold']} шт.",
             f"Куплено: {data['purchased']} шт.",
             f"Возвраты: {data['returned']} шт.",
-        ]))
+        ]
+
+        today_data = data.get("today")
+
+        if today_data is not None:
+            copy_lines.extend([
+                "",
+                "Сегодня:",
+                f"Прибыль: {today_data['profit']}",
+                f"Расходы: {today_data['expenses']}",
+                f"В продаже: {today_data['in_stock']} шт.",
+                f"Продано: {today_data['sold']} шт.",
+                f"Куплено: {today_data['purchased']} шт.",
+                f"Возвраты: {today_data['returned']} шт.",
+            ])
+
+        frame.setProperty("copy_text", "\n".join(copy_lines))
         frame.mousePressEvent = (
             lambda event, block=frame:
             self.select_month_block(block)
@@ -198,17 +215,32 @@ class Dashboard(QWidget):
 
         layout = QVBoxLayout(frame)
 
+        header_layout = QHBoxLayout()
+
         title_label = QLabel(title)
         title_label.setStyleSheet(
             "font-size: 18px; font-weight: bold;"
         )
-        layout.addWidget(title_label)
+        header_layout.addWidget(title_label)
 
+        if data.get("today") is not None:
+            today_title = QLabel("Сегодня")
+            today_title.setStyleSheet(
+                "font-size: 13px; font-weight: bold;"
+            )
+            today_title.setAlignment(Qt.AlignmentFlag.AlignRight)
+            header_layout.addWidget(today_title)
+
+        layout.addLayout(header_layout)
+
+        content_layout = QHBoxLayout()
+
+        # Левая колонка — показатели за месяц.
+        month_layout = QVBoxLayout()
 
         values = [
-            ("Прибыль", str(data['profit'])),
-            ("Расходы", str(data['expenses'])),
-
+            ("Прибыль", str(data["profit"])),
+            ("Расходы", str(data["expenses"])),
             ("В продаже", f"{data['in_stock']} шт."),
             ("Продано", f"{data['sold']} шт."),
             ("Куплено", f"{data['purchased']} шт."),
@@ -220,16 +252,49 @@ class Dashboard(QWidget):
 
             name_label = QLabel(name)
             value_label = QLabel(value)
-            value_label.setStyleSheet(
-                "font-weight: bold;"
-            )
+            value_label.setStyleSheet("font-weight: bold;")
 
             row.addWidget(name_label)
             row.addStretch()
             row.addWidget(value_label)
-            layout.addLayout(row)
 
+            month_layout.addLayout(row)
+
+        content_layout.addLayout(month_layout, 3)
+
+        # Разделитель между месячными значениями и сегодняшними.
+        if today_data is not None:
+            separator = QFrame()
+            separator.setFrameShape(QFrame.Shape.VLine)
+            separator.setFrameShadow(QFrame.Shadow.Sunken)
+            content_layout.addWidget(separator)
+
+        # Правая колонка — показатели за сегодня.
+        if today_data is not None:
+            today_layout = QVBoxLayout()
+
+            today_values = [
+                str(today_data["profit"]),
+                str(today_data["expenses"]),
+                f"{today_data['in_stock']} шт.",
+                f"{today_data['sold']} шт.",
+                f"{today_data['purchased']} шт.",
+                f"{today_data['returned']} шт.",
+            ]
+
+            for value in today_values:
+                value_label = QLabel(value)
+                value_label.setStyleSheet(
+                    "font-weight: bold;"
+                )
+                value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+                today_layout.addWidget(value_label)
+
+            content_layout.addLayout(today_layout, 2)
+
+        layout.addLayout(content_layout)
         layout.addStretch()
+
         return frame
 
     def select_month_block(self, block):
