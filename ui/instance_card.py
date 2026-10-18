@@ -572,23 +572,35 @@ class InstanceCard(QWidget):
                 )
             )
             if new_date:
-                connection.execute(
-                    """
-                    INSERT INTO events (
-                        event_date,
-                        event_type,
-                        instance_id,
-                        product_id
-                    )
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        new_date,
-                        "listed",
-                        self.instance_id,
-                        self.product_id
-                    )
+                event_type = "listed"
+                event_date = new_date
+                comment = None
+            else:
+                from datetime import date
+
+                event_type = "unlisted"
+                event_date = date.today().isoformat()
+                comment = None
+
+            connection.execute(
+                """
+                INSERT INTO events (
+                    event_date,
+                    event_type,
+                    instance_id,
+                    product_id,
+                    comment
                 )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    event_date,
+                    event_type,
+                    self.instance_id,
+                    self.product_id,
+                    comment
+                )
+            )
             connection.commit()
 
         except Exception as error:
@@ -697,6 +709,7 @@ class InstanceCard(QWidget):
         event_names = {
             "purchase": "Закупка",
             "listed": "Поступил в продажу",
+            "unlisted": "Снят с продажи",
             "sale": "Продажа",
             "return": "Возврат",
             "write_off": "Списание"
