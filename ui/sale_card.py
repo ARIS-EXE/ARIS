@@ -154,8 +154,15 @@ class SaleCard(QWidget):
         self.complete_button = QPushButton(
             "Завершить продажу"
         )
+
         if self.edit_mode:
-            self.complete_button.setText("Сохранить изменения")
+            self.complete_button.setText(
+                "Сохранить изменения"
+            )
+
+        self.complete_close_button = QPushButton(
+            "Завершить и закрыть"
+        )
 
         buttons_layout = QHBoxLayout()
 
@@ -166,6 +173,11 @@ class SaleCard(QWidget):
         buttons_layout.addWidget(
             self.complete_button
         )
+
+        buttons_layout.addWidget(
+            self.complete_close_button
+        )
+
         layout.addLayout(
             buttons_layout
         )
@@ -173,6 +185,11 @@ class SaleCard(QWidget):
         self.complete_button.clicked.connect(
             self.on_complete_button_clicked
         )
+
+        self.complete_close_button.clicked.connect(
+            self.on_complete_and_close
+        )
+
         self.add_item_button.clicked.connect(
             self.add_item
         )
@@ -285,6 +302,9 @@ class SaleCard(QWidget):
             self.complete_button.setEnabled(
                 False
             )
+            self.complete_close_button.setEnabled(
+                False
+            )
         else:
             # Режим редактирования
             self.sale_date.setEnabled(
@@ -300,6 +320,9 @@ class SaleCard(QWidget):
             )
 
             self.complete_button.setEnabled(
+                True
+            )
+            self.complete_close_button.setEnabled(
                 True
             )
 
@@ -1394,6 +1417,42 @@ class SaleCard(QWidget):
             return
 
         self.complete_sale()
+    def on_complete_and_close(self):
+        if self.edit_mode and self.sale_id is not None:
+            self._sale_save_success = False
+            self.save_sale_changes()
+
+            if not self._sale_save_success:
+                return
+
+        else:
+            self._sale_save_success = False
+            self.complete_sale()
+
+            if not self._sale_save_success:
+                return
+
+        tab_widget = self.parentWidget()
+
+        while tab_widget is not None:
+            if hasattr(tab_widget, "indexOf") and hasattr(
+                tab_widget,
+                "removeTab"
+            ):
+                tab_index = tab_widget.indexOf(self)
+
+                if tab_index != -1:
+                    tab_widget.removeTab(tab_index)
+                    self.deleteLater()
+                    return
+
+            tab_widget = tab_widget.parentWidget()
+
+        QMessageBox.warning(
+            self,
+            "Закрытие продажи",
+            "Не удалось найти вкладку продажи для закрытия."
+        )
     def save_sale_changes(self):
         from database.database import get_connection
 
@@ -1597,7 +1656,10 @@ class SaleCard(QWidget):
                 "Ошибка",
                 str(error)
             )
+        else:
+            self._sale_save_success = True
     def complete_sale(self):
+        self._sale_save_success = False
         if self.sale_completed:
             return
 
@@ -1723,6 +1785,7 @@ class SaleCard(QWidget):
             )
 
             self.sale_completed = True
+            self._sale_save_success = True
 
             self.complete_button.setEnabled(
                 False

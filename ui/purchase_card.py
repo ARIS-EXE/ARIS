@@ -298,6 +298,11 @@ class PurchaseCard(QWidget):
         # ------------------------------------------------------------
         # Сохранение
         # ------------------------------------------------------------
+        save_buttons_layout = QVBoxLayout()
+        save_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        save_buttons_layout.setSpacing(
+            buttons_layout.spacing()
+        )
 
         self.save_button = QPushButton(
             "Сохранить закупку"
@@ -307,9 +312,49 @@ class PurchaseCard(QWidget):
             self.save_purchase
         )
 
-        add_layout.addWidget(
-            self.save_button,
-            alignment=Qt.AlignTop
+        self.save_close_button = QPushButton(
+            "Сохранить и закрыть"
+        )
+
+        self.save_close_button.clicked.connect(
+            self.save_purchase_and_close
+        )
+
+        buttons_width = max(
+            self.add_button.sizeHint().width(),
+            self.add_existing_instance_button.sizeHint().width()
+        )
+
+        self.add_button.setMinimumWidth(buttons_width)
+        self.add_existing_instance_button.setMinimumWidth(
+            buttons_width
+        )
+
+        self.save_button.setFixedWidth(buttons_width)
+        self.save_close_button.setFixedWidth(buttons_width)
+
+        save_buttons_layout.addWidget(
+            self.save_button
+        )
+
+        save_buttons_layout.addWidget(
+            self.save_close_button
+        )
+
+        save_buttons_layout.addStretch()
+
+        add_layout.setAlignment(
+            buttons_layout,
+            Qt.AlignTop
+        )
+
+        add_layout.setAlignment(
+            save_buttons_layout,
+            Qt.AlignTop
+        )
+
+        add_layout.addLayout(
+            save_buttons_layout
         )
 
         main_area.addLayout(
@@ -1099,8 +1144,12 @@ class PurchaseCard(QWidget):
         self.update_total_count()
         if self.read_only:
             self.set_read_only_mode()
+            self.save_button.setEnabled(False)
+            self.save_close_button.setEnabled(False)
 
     def save_purchase(self):
+        self._purchase_save_success = False
+
         if self.purchase_id is not None:
             self.update_existing_purchase()
             return
@@ -1200,6 +1249,7 @@ class PurchaseCard(QWidget):
         self.purchase_id = purchase_id
 
         self.load_purchase(purchase_id)
+        self._purchase_save_success = True
         return
         self.product_list.clear()
 
@@ -1299,7 +1349,38 @@ class PurchaseCard(QWidget):
         )
 
         self.load_purchase(self.purchase_id)
+        self._purchase_save_success = True
+    def save_purchase_and_close(self):
+        self.save_purchase()
 
+        if not getattr(
+            self,
+            "_purchase_save_success",
+            False
+        ):
+            return
+
+        tab_widget = self.parentWidget()
+
+        while tab_widget is not None:
+            if hasattr(tab_widget, "indexOf") and hasattr(
+                tab_widget,
+                "removeTab"
+            ):
+                tab_index = tab_widget.indexOf(self)
+
+                if tab_index != -1:
+                    tab_widget.removeTab(tab_index)
+                    self.deleteLater()
+                    return
+
+            tab_widget = tab_widget.parentWidget()
+
+        QMessageBox.warning(
+            self,
+            "Закрытие закупки",
+            "Не удалось найти вкладку закупки для закрытия."
+        )
     def show_product_list_context_menu(self, position):
         item = self.product_list.itemAt(position)
 

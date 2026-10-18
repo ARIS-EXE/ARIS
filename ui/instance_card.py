@@ -216,6 +216,10 @@ class InstanceCard(QWidget):
             "Сохранить"
         )
 
+        self.save_close_button = QPushButton(
+            "Сохранить и закрыть"
+        )
+
         self.product_button = QPushButton(
             "К товару"
         )
@@ -224,16 +228,26 @@ class InstanceCard(QWidget):
             self.save
         )
 
+        self.save_close_button.clicked.connect(
+            self.save_and_close
+        )
+
         self.product_button.clicked.connect(
             self.open_product_card
         )
+
+        buttons_layout.addWidget(
+            self.product_button
+        )
+
+        buttons_layout.addStretch()
 
         buttons_layout.addWidget(
             self.save_button
         )
 
         buttons_layout.addWidget(
-            self.product_button
+            self.save_close_button
         )
 
         main_layout.addLayout(
@@ -375,7 +389,9 @@ class InstanceCard(QWidget):
             return True
 
         return super().eventFilter(obj, event)
-
+    def save_and_close(self):
+        if self.save():
+            self.close()
     def save(self):
         from database.database import get_connection
 
@@ -405,7 +421,7 @@ class InstanceCard(QWidget):
                     "Ошибка",
                     "Экземпляр не найден."
                 )
-                return
+                return False
 
             # Если экземпляр снят с продажи, не сохраняем новую дату
             if not current[0]:
@@ -481,7 +497,7 @@ class InstanceCard(QWidget):
                 "Ошибка",
                 f"Не удалось сохранить экземпляр:\n\n{error}"
             )
-            return
+            return False
 
         finally:
             connection.close()
@@ -497,7 +513,7 @@ class InstanceCard(QWidget):
 
     def open_product_card(self):
         if self.product_id is None:
-            return
+            return True
 
         window = self.window()
 

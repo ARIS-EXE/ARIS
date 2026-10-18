@@ -127,7 +127,6 @@ class MainWindow(QMainWindow):
 
         left_layout.addStretch(1)
 
-
         settings_button = QPushButton("Настройки")
         settings_button.setFixedWidth(180)
         settings_button.clicked.connect(
@@ -135,7 +134,6 @@ class MainWindow(QMainWindow):
         )
 
         left_layout.addWidget(settings_button)
-
 
         main_layout.addLayout(left_layout, 0)
         self.dashboard = Dashboard()
@@ -268,8 +266,6 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(
             tab_index
         )
-
-
 
     def open_purchase(self, purchase_id, read_only=False):
         purchase_tab = PurchaseCard(
