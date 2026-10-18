@@ -151,13 +151,15 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(deleted_button)
 
         left_layout.addStretch(1)
-
+        analytics_button = QPushButton("Аналитика")
         settings_button = QPushButton("Настройки")
+        analytics_button.setFixedWidth(180)
+        analytics_button.clicked.connect(self.open_analytics)
         settings_button.setFixedWidth(180)
         settings_button.clicked.connect(
             self.open_settings
         )
-
+        left_layout.addWidget(analytics_button)
         left_layout.addWidget(settings_button)
 
         main_layout.addLayout(left_layout, 0)
@@ -165,7 +167,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.dashboard)
 
         version_label = QLabel(
-            "Версия 1.0  Prod. by Iev37"
+            "Версия 1.1.0  Prod. by Iev37"
         )
         version_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
@@ -525,6 +527,11 @@ class MainWindow(QMainWindow):
         if isinstance(widget, Inventory):
             widget.category_filter_id = category_id
             widget.load_products()
+    def open_analytics(self):
+        self.open_section(
+            "Аналитика",
+            lambda: Dashboard()
+        )
     def open_categories(self):
         self.open_section(
             "Категории",
