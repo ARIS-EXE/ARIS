@@ -12,6 +12,10 @@ from database.database import get_connection
 class CategorySelector(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        if not hasattr(parent, "_category_tree_state"):
+            parent._category_tree_state = {}
+
+        self.tree_state = parent._category_tree_state
 
         self.setWindowTitle("Выбор категории")
         self.resize(450, 500)
@@ -75,7 +79,20 @@ class CategorySelector(QDialog):
             elif parent_id in items:
                 items[parent_id].addChild(item)
 
-        self.tree.expandAll()
+        def restore_expanded_state(item):
+            category_id = item.data(0, 1000)
+
+            item.setExpanded(
+                self.tree_state.get(category_id, False)
+            )
+
+            for index in range(item.childCount()):
+                restore_expanded_state(item.child(index))
+
+        for index in range(self.tree.topLevelItemCount()):
+            restore_expanded_state(
+                self.tree.topLevelItem(index)
+            )
 
     def select_category(self):
         item = self.tree.currentItem()
@@ -95,4 +112,22 @@ class CategorySelector(QDialog):
 
         self.selected_category_name = item.text(0)
 
+        self.save_expanded_state()
         self.accept()
+    def save_expanded_state(self):
+        def save_item_state(item):
+            category_id = item.data(0, 1000)
+
+            self.tree_state[category_id] = item.isExpanded()
+
+            for index in range(item.childCount()):
+                save_item_state(item.child(index))
+
+        for index in range(self.tree.topLevelItemCount()):
+            save_item_state(
+                self.tree.topLevelItem(index)
+            )
+
+    def closeEvent(self, event):
+        self.save_expanded_state()
+        super().closeEvent(event)

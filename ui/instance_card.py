@@ -274,7 +274,9 @@ class InstanceCard(QWidget):
                     instances.status,
                     instances.listed_date,
                     instances.notes,
-                    products.name
+                    products.name,
+                    products.manufacturer,
+                    products.part_number
                 FROM instances
                 JOIN products
                     ON products.id = instances.product_id
@@ -295,8 +297,16 @@ class InstanceCard(QWidget):
             str(instance[0])
         )
 
+        product_name = "	".join(
+            part for part in (
+                instance[10],
+                instance[11],
+                instance[9]
+            ) if part
+        )
+
         self.product_name.setText(
-            instance[9] or ""
+            product_name
         )
 
         condition_index = self.condition.findData(

@@ -30,7 +30,31 @@ from ui.dashboard import Dashboard
 from backup.backup_settings_dialog import BackupSettingsDialog
 from backup.backup_manager import create_automatic_backup
 from ui.settings import SettingsDialog
+class HighlightTabBar(QTabBar):
+    def paintEvent(self, event):
+        super().paintEvent(event)
 
+        index = self.currentIndex()
+
+        if index < 0:
+            return
+
+        rect = self.tabRect(index)
+
+        from PySide6.QtGui import QPainter, QPen
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        pen = QPen(Qt.GlobalColor.blue, 1)
+        painter.setPen(pen)
+
+        painter.drawLine(
+            rect.left() + 6,
+            rect.bottom() - 2,
+            rect.right() - 6,
+            rect.bottom() - 2
+        )
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -47,6 +71,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 750)
 
         self.tabs = QTabWidget()
+        self.tabs.setTabBar(HighlightTabBar())
         self.setCentralWidget(self.tabs)
         self.tabs.setTabsClosable(True)
 
@@ -65,7 +90,7 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
 
-        title = QLabel("RC Inventory")
+        title = QLabel("ARIS")
         title.setStyleSheet(
             "font-size: 28px; font-weight: bold;"
         )

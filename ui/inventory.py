@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QStyle,
     QDialog,
     QLabel,
+    QHeaderView,
+    QStyleOptionHeader,
 )
 
 from database.database import get_connection
@@ -255,6 +257,98 @@ class ImageViewer(QDialog):
         layout.addWidget(
             self.close_button
         )
+class InventoryHeader(QHeaderView):
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+
+        self.sort_column = None
+        self.sort_order = Qt.SortOrder.AscendingOrder
+        self.setSortIndicatorShown(False)
+
+    def paintSection(self, painter, rect, logical_index):
+        if not rect.isValid():
+            return
+
+        option = QStyleOptionHeader()
+        self.initStyleOption(option)
+        self.initStyleOptionForIndex(
+            option,
+            logical_index
+        )
+
+        option.rect = rect
+        option.textAlignment = (
+            Qt.AlignmentFlag.AlignVCenter
+            | Qt.AlignmentFlag.AlignLeft
+        )
+
+        is_sorted = (
+            self.sort_column is not None
+            and logical_index == self.sort_column
+            and logical_index != 0
+        )
+
+        if is_sorted:
+            option.text = "   " + option.text
+
+        option.sortIndicator = (
+            QStyleOptionHeader.SortIndicator.None_
+        )
+
+        self.style().drawControl(
+            QStyle.ControlElement.CE_Header,
+            option,
+            painter,
+            self
+        )
+
+        if is_sorted:
+            arrow = (
+                "↓"
+                if self.sort_order
+                == Qt.SortOrder.AscendingOrder
+                else "↑"
+            )
+
+            painter.save()
+            painter.setPen(
+                self.palette().color(
+                    self.foregroundRole()
+                )
+            )
+
+            painter.drawText(
+                rect.adjusted(6, 0, -4, 0),
+                Qt.AlignmentFlag.AlignVCenter
+                | Qt.AlignmentFlag.AlignLeft,
+                arrow
+            )
+            painter.restore()
+class InventoryTreeWidgetItem(QTreeWidgetItem):
+    def __lt__(self, other):
+        tree = self.treeWidget()
+
+        if tree is None:
+            return self.text(0).casefold() < other.text(0).casefold()
+
+        column = tree.header().sortIndicatorSection()
+
+        if column == 5:
+            self_value = self.data(
+                5,
+                Qt.ItemDataRole.UserRole
+            )
+            other_value = other.data(
+                5,
+                Qt.ItemDataRole.UserRole
+            )
+
+            return int(self_value or 0) < int(other_value or 0)
+
+        return (
+            self.text(column).casefold()
+            < other.text(column).casefold()
+        )
 class Inventory(QWidget):
     def __init__(self, main_window):
         super().__init__()
@@ -263,6 +357,8 @@ class Inventory(QWidget):
 
         self.products_data = []
         self.expanded_product_ids = set()
+        self.sort_column = None
+        self.sort_order = Qt.SortOrder.AscendingOrder
         main_layout = QVBoxLayout(self)
 
         # Поиск
@@ -325,6 +421,12 @@ class Inventory(QWidget):
 
         # Дерево склада
         self.tree = QTreeWidget()
+        self.tree.setHeader(
+            InventoryHeader(
+                Qt.Orientation.Horizontal,
+                self.tree
+            )
+        )
         self.tree.setExpandsOnDoubleClick(False)
         self.tree.installEventFilter(self)
         self.tree.setHeaderLabels([
@@ -335,6 +437,18 @@ class Inventory(QWidget):
             "Штрихкод",
             "Количество",
         ])
+        header = self.tree.header()
+        header.setSectionsClickable(True)
+        header.setHighlightSections(False)
+        header.sectionClicked.connect(
+            self.sort_products_by_column
+        )
+        self.tree.setSortingEnabled(False)
+
+        header = self.tree.header()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+
         self.tree.itemDoubleClicked.connect(
             self.on_tree_double_click
         )
@@ -356,22 +470,64 @@ class Inventory(QWidget):
             "Inventory"
         )
 
-        header_state = self.header_settings.value(
-            "tree_header_state"
+        header = self.tree.header()
+        saved_widths = self.header_settings.value(
+            "tree_column_widths"
         )
 
-        if header_state is not None:
-            self.tree.header().restoreState(
-                header_state
-            )
+        if saved_widths:
+            for column, width in enumerate(saved_widths):
+                if column < header.count():
+                    header.resizeSection(
+                        column,
+                        int(width)
+                    )
+
+        header.sectionResized.connect(
+            self.save_header_state
+        )
 
         self.tree.header().sectionResized.connect(
             self.save_header_state
         )
+    def sort_products_by_column(self, column):
+        if column == self.sort_column:
+            self.sort_order = (
+                Qt.SortOrder.DescendingOrder
+                if self.sort_order
+                == Qt.SortOrder.AscendingOrder
+                else Qt.SortOrder.AscendingOrder
+            )
+        else:
+            self.sort_column = column
+            self.sort_order = Qt.SortOrder.AscendingOrder
+
+        header = self.tree.header()
+        header.sort_column = self.sort_column
+        header.sort_order = self.sort_order
+
+        header.setSortIndicatorShown(False)
+        header.setSortIndicator(
+            -1,
+            self.sort_order
+        )
+        header.viewport().update()
+
+        self.tree.sortItems(
+            self.sort_column,
+            self.sort_order
+        )
     def save_header_state(self, *args):
+        header = self.tree.header()
+
+        widths = [
+            header.sectionSize(column)
+            for column in range(header.count())
+        ]
+
         self.header_settings.setValue(
-            "tree_header_state",
-            self.tree.header().saveState()
+            "tree_column_widths",
+            widths
         )
     def on_tree_double_click(self, item, column):
         if item.parent() is not None:
@@ -633,7 +789,7 @@ class Inventory(QWidget):
                 if show_sold:
                     quantity += sold_count
 
-            product_item = QTreeWidgetItem([
+            product_item = InventoryTreeWidgetItem([
                 "",
                 product[1] or "",
                 product[2] or "",
@@ -641,7 +797,11 @@ class Inventory(QWidget):
                 product[4] or "",
                 str(quantity),
             ])
-
+            product_item.setData(
+                5,
+                Qt.ItemDataRole.UserRole,
+                int(quantity or 0)
+            )
             product_item.setData(
                 0,
                 Qt.ItemDataRole.UserRole,
