@@ -18,7 +18,7 @@ OutputBaseFilename=ARIS_Setup_1.2.0
 Compression=lzma
 SolidCompression=yes
 
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64os
 PrivilegesRequired=admin
 
 UninstallDisplayIcon={app}\{#MyAppExeName}
