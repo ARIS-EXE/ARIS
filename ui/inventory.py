@@ -646,11 +646,19 @@ class Inventory(QWidget):
                             OR products.part_number LIKE ?
                             OR products.name LIKE ?
                             OR products.barcode LIKE ?
+                            OR EXISTS (
+                                SELECT 1
+                                FROM instances AS search_instance
+                                WHERE search_instance.product_id = products.id
+                                  AND search_instance.deleted = 0
+                                  AND CAST(search_instance.internal_number AS TEXT) LIKE ?
+                            )
                         )
                         """
                     )
 
                     parameters.extend([
+                        pattern,
                         pattern,
                         pattern,
                         pattern,
@@ -738,7 +746,9 @@ class Inventory(QWidget):
         finally:
             connection.close()
 
+        self.find_instance_by_number()
         self.apply_filters()
+        self.select_instance_by_number()
 
     def apply_filters(self):
         self.save_expanded_state()
@@ -770,7 +780,10 @@ class Inventory(QWidget):
                 )
 
             if not visible:
-                continue
+                if product_id != getattr(
+                    self, "search_product_id", None
+                ):
+                    continue
 
             # Определяем количество
             if show_all:
@@ -906,7 +919,10 @@ class Inventory(QWidget):
                 pass
 
             else:
-                continue
+                if instance[0] != getattr(
+                    self, "search_instance_id", None
+                ):
+                    continue
             condition = condition_names.get(
                 instance[3],
                 instance[3]
@@ -980,6 +996,85 @@ class Inventory(QWidget):
             product_item.addChild(
                 instance_item
             )
+
+    def find_instance_by_number(self):
+        self.search_instance_id = None
+        self.search_product_id = None
+
+        search_text = self.search.text().strip()
+
+        if not search_text.isdigit():
+            return
+
+        connection = get_connection()
+
+        try:
+            result = connection.execute(
+                """
+                SELECT id, product_id
+                FROM instances
+                WHERE CAST(internal_number AS TEXT) = ?
+                  AND deleted = 0
+                LIMIT 1
+                """,
+                (search_text,)
+            ).fetchone()
+
+            if result is not None:
+                self.search_instance_id = result[0]
+                self.search_product_id = result[1]
+
+        finally:
+            connection.close()
+
+    def select_instance_by_number(self):
+        instance_id = getattr(
+            self, "search_instance_id", None
+        )
+
+        product_id = getattr(
+            self, "search_product_id", None
+        )
+
+        if instance_id is None or product_id is None:
+            return
+
+        for i in range(self.tree.topLevelItemCount()):
+            product_item = self.tree.topLevelItem(i)
+
+            current_product_id = product_item.data(
+                0,
+                Qt.ItemDataRole.UserRole
+            )
+
+            if current_product_id != product_id:
+                continue
+
+            if product_item.childCount() == 0:
+                self.load_instances(
+                    product_item,
+                    int(product_id)
+                )
+
+            for j in range(product_item.childCount()):
+                instance_item = product_item.child(j)
+
+                current_instance_id = instance_item.data(
+                    0,
+                    Qt.ItemDataRole.UserRole + 1
+                )
+
+                if current_instance_id != instance_id:
+                    continue
+
+                product_item.setExpanded(True)
+                self.tree.setCurrentItem(instance_item)
+                self.tree.scrollToItem(instance_item)
+
+                self.search_instance_id = None
+                self.search_product_id = None
+
+                return
 
     def toggle_tree_item(self, item, column):
         if item.parent() is not None:

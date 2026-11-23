@@ -1,6 +1,6 @@
 
 #define MyAppName "ARIS"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.2.0"
 #define MyAppPublisher "ARIS"
 #define MyAppExeName "ARIS.exe"
 
@@ -13,7 +13,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\RC Inventory
 DefaultGroupName=ARIS
 OutputDir=installer
-OutputBaseFilename=ARIS_Setup_1.1.0
+OutputBaseFilename=ARIS_Setup_1.2.0
 
 Compression=lzma
 SolidCompression=yes

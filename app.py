@@ -1,7 +1,8 @@
 import sys
 
 from PySide6.QtCore import Qt
-
+from PySide6.QtGui import QIcon
+from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -167,7 +168,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.dashboard)
 
         version_label = QLabel(
-            "Версия 1.1.0  Prod. by Iev37"
+            "Версия 1.2.0  Prod. by Iev37"
         )
         version_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
@@ -670,6 +671,11 @@ class MainWindow(QMainWindow):
 initialize_database()
 
 app = QApplication(sys.argv)
+
+icon_path = Path(__file__).resolve().parent / "aris.ico"
+
+if icon_path.exists():
+    app.setWindowIcon(QIcon(str(icon_path)))
 
 window = MainWindow()
 window.show()
