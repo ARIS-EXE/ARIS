@@ -11,7 +11,11 @@ from PySide6.QtWidgets import (
     QApplication
 )
 from database.database import get_connection
-
+from ui.context_menus import (
+    add_open_product_action,
+    add_open_instance_action,
+    add_open_purchase_action,
+)
 
 class Trash(QWidget):
     def __init__(self, main_window):
@@ -214,8 +218,11 @@ class Trash(QWidget):
 
         menu = QMenu(self)
 
-        open_action = menu.addAction(
-            "Открыть карточку товара"
+        add_open_product_action(
+            menu,
+            self.main_window,
+            product_id,
+            allow_deleted=True
         )
 
         menu.addSeparator()
@@ -228,12 +235,7 @@ class Trash(QWidget):
             self.product_list.mapToGlobal(position)
         )
 
-        if action == open_action:
-            self.main_window.open_deleted_product(
-                product_id
-            )
-
-        elif action == restore_action:
+        if action == restore_action:
             connection = get_connection()
             try:
                 connection.execute(
@@ -268,27 +270,26 @@ class Trash(QWidget):
 
         menu = QMenu(self)
 
-        open_product_action = menu.addAction(
-            "Открыть карточку товара"
+        add_open_product_action(
+            menu,
+            self.main_window,
+            product_id
         )
 
-        open_instance_action = menu.addAction(
-            "Открыть карточку экземпляра"
+        add_open_instance_action(
+            menu,
+            self.main_window,
+            instance_id
         )
-
-        action = menu.exec(
+        add_open_purchase_action(
+            menu,
+            self.main_window,
+            instance_id
+        )
+        menu.exec(
             self.written_off_list.mapToGlobal(position)
         )
 
-        if action == open_product_action:
-            self.main_window.open_product_card(
-                product_id
-            )
-
-        elif action == open_instance_action:
-            self.main_window.open_instance_card(
-                instance_id
-            )
     def load_products(self):
         self.product_list.clear()
 

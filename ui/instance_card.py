@@ -19,6 +19,10 @@ from PySide6.QtWidgets import (
 )
 
 from database.database import get_connection
+from ui.context_menus import (
+    add_open_purchase_by_id_action,
+    add_open_sale_by_id_action,
+)
 class NullableDateEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -669,40 +673,25 @@ class InstanceCard(QWidget):
         if item is None:
             return
 
-        event_type = item.data(
-            Qt.UserRole
-        )
-
-        purchase_id = item.data(
-            Qt.UserRole + 1
-        )
-
-        sale_id = item.data(
-            Qt.UserRole + 2
-        )
+        event_type = item.data(Qt.UserRole)
+        purchase_id = item.data(Qt.UserRole + 1)
+        sale_id = item.data(Qt.UserRole + 2)
 
         menu = QMenu(self)
+        main_window = self.window()
 
         if event_type == "purchase" and purchase_id:
-            open_purchase_action = menu.addAction(
-                "Открыть закупку"
-            )
-
-            open_purchase_action.triggered.connect(
-                lambda: self.window().open_purchase(
-                    purchase_id
-                )
+            add_open_purchase_by_id_action(
+                menu,
+                main_window,
+                purchase_id
             )
 
         elif event_type == "sale" and sale_id:
-            open_sale_action = menu.addAction(
-                "Открыть продажу"
-            )
-
-            open_sale_action.triggered.connect(
-                lambda: self.window().open_sale(
-                    sale_id
-                )
+            add_open_sale_by_id_action(
+                menu,
+                main_window,
+                sale_id
             )
 
         else:

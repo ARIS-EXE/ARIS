@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from database.database import get_connection
 from pathlib import Path
-
+from ui.context_menus import show_instance_menu
 
 from app_paths import IMAGE_DIR
 class ImageCanvas(QWidget):
@@ -945,7 +945,14 @@ class Inventory(QWidget):
                 Qt.ItemDataRole.UserRole + 2,
                 product_id
             )
-            if status == "Продан":
+
+            instance_item.setData(
+                0,
+                Qt.ItemDataRole.UserRole + 3,
+                instance_status
+            )
+
+            if instance_status == "sold":
                 light_green = QColor("#DDF0DD")
 
                 for column in range(6):
@@ -954,7 +961,7 @@ class Inventory(QWidget):
                         light_green
                     )
 
-            elif status == "Списан":
+            elif instance_status == "written_off":
                 for column in range(6):
                     instance_item.setBackground(
                         column,
@@ -1056,32 +1063,21 @@ class Inventory(QWidget):
         menu = QMenu(self)
 
         if instance_id is not None:
-            product_action = menu.addAction(
-                "Открыть карточку товара"
-            )
-            product_action.triggered.connect(
-                lambda: self.main_window.open_product_card(
-                    int(instance_product_id)
-                )
-            )
-            action = menu.addAction(
-                "Открыть карточку экземпляра"
+            status = item.data(
+                0,
+                Qt.ItemDataRole.UserRole + 3
             )
 
-            action.triggered.connect(
-                lambda: self.main_window.open_instance_card(
-                    int(instance_id)
-                )
+            show_instance_menu(
+                parent=self,
+                global_position=self.tree.viewport().mapToGlobal(position),
+                main_window=self.main_window,
+                instance_id=int(instance_id),
+                product_id=int(instance_product_id),
+                status=status
             )
-            menu.addSeparator()
 
-            sell_action = menu.addAction("Продать")
-
-            sell_action.triggered.connect(
-                lambda: self.main_window.sell_instance(
-                    int(instance_id)
-                )
-            )
+            return
         elif product_id is not None:
             action = menu.addAction(
                 "Открыть карточку товара"

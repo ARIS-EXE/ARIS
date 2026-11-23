@@ -30,6 +30,13 @@ from models.purchase import (
     update_purchase,
     get_unlinked_instances,
 )
+from ui.context_menus import (
+    add_open_product_action,
+    add_open_instance_action,
+    add_sell_instance_action,
+    add_write_off_action,
+    add_open_sale_action
+)
 
 class PurchaseCard(QWidget):
 
@@ -943,6 +950,7 @@ class PurchaseCard(QWidget):
 
         product_id = product_item.data(1000)
         listed_date = None
+        instance_status = None
 
         # Для существующего экземпляра получаем данные из БД
         if existing_instance_id is not None:
@@ -951,7 +959,7 @@ class PurchaseCard(QWidget):
             try:
                 result = connection.execute(
                     """
-                    SELECT product_id, listed_date
+                    SELECT product_id, listed_date, status
                     FROM instances
                     WHERE id = ?
                       AND deleted = 0
@@ -967,7 +975,7 @@ class PurchaseCard(QWidget):
                     )
                     return
 
-                product_id, listed_date = result
+                product_id, listed_date, instance_status = result
 
             finally:
                 connection.close()
@@ -977,17 +985,43 @@ class PurchaseCard(QWidget):
 
         menu = QMenu(self)
 
-        open_product_action = menu.addAction(
-            "Открыть карточку товара"
+        add_open_product_action(
+            menu,
+            self.main_window,
+            product_id
         )
 
-        open_instance_action = None
-
         if existing_instance_id is not None:
-            open_instance_action = menu.addAction(
-                "Открыть карточку экземпляра"
+            add_open_instance_action(
+                menu,
+                self.main_window,
+                existing_instance_id
+            )
+        if existing_instance_id is not None:
+            menu.addSeparator()
+
+            add_sell_instance_action(
+                menu,
+                self.main_window,
+                existing_instance_id,
+                instance_status
             )
 
+            add_open_sale_action(
+                menu,
+                self.main_window,
+                existing_instance_id,
+                instance_status
+            )
+            add_write_off_action(
+                menu=menu,
+                parent=self,
+                instance_id=existing_instance_id,
+                status=instance_status,
+                on_success=lambda: self.main_window.refresh_current_tab(
+                    self.main_window.tabs.indexOf(self)
+                )
+            )
         delete_row_action = None
 
         if not self.read_only:
@@ -1001,18 +1035,7 @@ class PurchaseCard(QWidget):
             self.items_table.mapToGlobal(position)
         )
 
-        if action == open_product_action:
-            self.main_window.open_product_card(product_id)
-
-        elif (
-            open_instance_action is not None
-            and action == open_instance_action
-        ):
-            self.main_window.open_instance_card(
-                existing_instance_id
-            )
-
-        elif (
+        if (
             delete_row_action is not None
             and action == delete_row_action
         ):
@@ -1453,15 +1476,12 @@ class PurchaseCard(QWidget):
 
         menu = QMenu(self)
 
-        open_action = menu.addAction(
-            "Открыть карточку товара"
+        add_open_product_action(
+            menu,
+            self.main_window,
+            product_id
         )
 
-        action = menu.exec(
+        menu.exec(
             self.product_list.mapToGlobal(position)
         )
-
-        if action == open_action:
-            self.main_window.open_product_card(
-                product_id
-            )

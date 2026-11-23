@@ -10,7 +10,13 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QApplication
 )
-
+from ui.context_menus import (
+    add_write_off_action,
+    add_open_product_action,
+    add_open_instance_action,
+    add_sell_instance_action,
+    add_open_sale_action,
+)
 from models.purchase import (
     get_purchases,
     get_purchase_items,
@@ -202,7 +208,11 @@ class PurchasesJournal(QWidget):
                     Qt.ItemDataRole.UserRole + 1,
                     instance_id
                 )
-
+                child.setData(
+                    0,
+                    Qt.ItemDataRole.UserRole + 4,
+                    status
+                )
                 child.setData(
                     0,
                     Qt.ItemDataRole.UserRole + 2,
@@ -308,73 +318,50 @@ class PurchasesJournal(QWidget):
         if instance_id is None or product_id is None:
             return
 
-        status = item.text(6)
-
-        product_action = menu.addAction(
-            "Открыть карточку товара"
+        instance_status = item.data(
+            0,
+            Qt.ItemDataRole.UserRole + 4
         )
-        product_action.triggered.connect(
-            lambda: self.main_window.open_product_card(
-                int(product_id),
-                allow_deleted=True
+
+        add_open_product_action(
+            menu,
+            self.main_window,
+            product_id,
+            allow_deleted=True
+        )
+
+        add_open_instance_action(
+            menu,
+            self.main_window,
+            instance_id
+        )
+
+        if instance_status in ("in_stock", "sold"):
+            menu.addSeparator()
+
+            add_sell_instance_action(
+                menu,
+                self.main_window,
+                instance_id,
+                instance_status
             )
-        )
 
-        instance_action = menu.addAction(
-            "Открыть карточку экземпляра"
-        )
-        instance_action.triggered.connect(
-            lambda: self.main_window.open_instance_card(
-                int(instance_id)
+            add_open_sale_action(
+                menu,
+                self.main_window,
+                instance_id,
+                instance_status
             )
-        )
 
-        menu.addSeparator()
+        if instance_status == "in_stock":
+            add_write_off_action(
+                menu=menu,
+                parent=self,
+                instance_id=instance_id,
+                status=instance_status,
+                on_success=self.load_purchases
+            )
 
-        write_off_action = menu.addAction(
-            "Списать экземпляр"
-        )
-
-        if status in ("Продан", "Списан"):
-            write_off_action.setEnabled(False)
-
-        action = menu.exec(
+        menu.exec(
             self.tree.viewport().mapToGlobal(position)
         )
-
-        if action == write_off_action:
-            comment, ok = QInputDialog.getText(
-                self,
-                "Списание экземпляра",
-                "Причина списания:"
-            )
-
-            if not ok:
-                return
-
-            comment = comment.strip()
-
-            if not comment:
-                QMessageBox.warning(
-                    self,
-                    "Ошибка",
-                    "Причина списания обязательна."
-                )
-                return
-
-            from models.instance import write_off_instance
-
-            try:
-                write_off_instance(
-                    int(instance_id),
-                    comment
-                )
-
-                self.load_purchases()
-
-            except Exception as error:
-                QMessageBox.warning(
-                    self,
-                    "Ошибка",
-                    str(error)
-                )

@@ -11,7 +11,11 @@ from PySide6.QtWidgets import (
     QApplication,
     QMenu
 )
-
+from ui.context_menus import (
+    add_open_instance_action,
+    add_open_purchase_action,
+    add_open_product_action,
+)
 
 class SalesJournal(QWidget):
 
@@ -383,13 +387,31 @@ class SalesJournal(QWidget):
         instance_id = int(
             item.text(6)
         )
-        open_product_action = menu.addAction(
-            "Открыть карточку товара"
-        )
-        open_instance_action = menu.addAction(
-            "Открыть карточку экземпляра"
-        )
+        from models.instance import get_instance
 
+        instance = get_instance(instance_id)
+
+        if instance is not None:
+            product_id = instance[2]
+
+            add_open_product_action(
+                menu,
+                self.window(),
+                product_id,
+                allow_deleted=True
+            )
+        window = self.window()
+
+        add_open_instance_action(
+            menu,
+            window,
+            instance_id
+        )
+        add_open_purchase_action(
+            menu,
+            window,
+            instance_id
+        )
         return_action = menu.addAction(
             "Вернуть товар"
         )
@@ -403,44 +425,8 @@ class SalesJournal(QWidget):
             )
         )
 
-        if action == open_product_action:
-            from models.instance import get_instance
-
-            instance = get_instance(
-                instance_id
-            )
-
-            if instance is None:
-                return
-
-            product_id = instance[2]
-
-            window = self.window()
-
-            if hasattr(
-                window,
-                "open_product_card"
-            ):
-                window.open_product_card(
-                    product_id,
-                    allow_deleted=True
-                )
-
-        elif action == open_instance_action:
-            window = self.window()
-
-            if hasattr(
-                window,
-                "open_instance_card"
-            ):
-                window.open_instance_card(
-                    instance_id
-                )
-
-        elif action == return_action:
-            self.return_instance(
-                item
-            )
+        if action == return_action:
+            self.return_instance(item)
 
     def return_instance(self, item):
         from PySide6.QtWidgets import QInputDialog

@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 from database.database import get_connection
 from ui.category_selector import CategorySelector
 from ui.product_statistics import ProductStatisticsDialog
+from ui.context_menus import show_instance_menu
 
 from app_paths import IMAGE_DIR
 
@@ -1268,69 +1269,23 @@ class ProductCard(QWidget):
         if item is None:
             return
 
-        status = item.data(
-            Qt.ItemDataRole.UserRole + 1
-        )
-
         instance_id = item.data(
             Qt.ItemDataRole.UserRole
         )
 
-        from models.purchase import get_purchase_id_by_instance
-
-        purchase_id = get_purchase_id_by_instance(instance_id)
-
-        menu = QMenu(self)
-
-        purchase_action = None
-        buy_action = None
-        sale_action = None
-
-        if status in ("in_stock", "sold", "written_off"):
-            if purchase_id is not None:
-                purchase_action = menu.addAction(
-                    "Открыть документ закупки"
-                )
-            else:
-                buy_action = menu.addAction(
-                    "Закупить"
-                )
-
-        if status == "sold":
-            sale_action = menu.addAction(
-                "Открыть документ продажи"
-            )
-
-        open_action = menu.addAction(
-            "Открыть карточку экземпляра"
+        status = item.data(
+            Qt.ItemDataRole.UserRole + 1
         )
 
-        action = menu.exec(
-            self.instances_list.mapToGlobal(position)
+        show_instance_menu(
+            parent=self,
+            global_position=self.instances_list.mapToGlobal(position),
+            main_window=self.window(),
+            instance_id=instance_id,
+            product_id=self.product_id,
+            status=status,
+            show_product_action=False
         )
-
-        if action == open_action:
-            self.open_instance(item)
-
-        elif action == buy_action and buy_action is not None:
-            self.window().open_purchase_for_instance(
-                int(instance_id)
-            )
-
-        elif action == purchase_action and purchase_action is not None:
-            self.window().open_purchase(
-                int(purchase_id)
-            )
-
-        elif action == sale_action and sale_action is not None:
-            from models.sale import get_sale_id_by_instance
-
-            sale_id = get_sale_id_by_instance(instance_id)
-
-            if sale_id is not None:
-                self.window().open_sale(
-                    int(sale_id)
-                )
 
     def open_instance(self, item):
         instance_number = (

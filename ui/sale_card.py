@@ -16,6 +16,12 @@ from PySide6.QtWidgets import (
 )
 from database.database import get_connection
 from models.commission_formula import evaluate_formula, FormulaError
+from ui.context_menus import (
+    add_open_product_action,
+    add_open_instance_action,
+    add_open_purchase_action,
+)
+
 class SaleCard(QWidget):
 
     def __init__(self, sale_id=None, edit_mode=False, main_window=None):
@@ -758,27 +764,54 @@ class SaleCard(QWidget):
 
             results_layout.addWidget(button)
     def show_item_context_menu(self, position):
-        item = self.items_table.itemAt(
-            position
-        )
+        item = self.items_table.itemAt(position)
 
         if item is None:
             return
 
-        row = self.items_table.rowAt(
-            position.y()
-        )
+        row = self.items_table.rowAt(position.y())
 
         if row < 0:
             return
 
+        table_item = self.items_table.item(row, 0)
+
+        instance_id = None
+        product_id = None
+
+        if table_item is not None:
+            instance_id = table_item.data(Qt.UserRole)
+
+        values = self.existing_item_values.get(row)
+
+        if values is not None:
+            product_id = values.get("product_id")
+
+        if product_id is None and table_item is not None:
+            product_id = table_item.data(Qt.UserRole + 1)
+
         menu = QMenu(self)
-        open_product_action = menu.addAction(
-            "Открыть карточку товара"
-        )
-        open_instance_action = menu.addAction(
-            "Открыть карточку экземпляра"
-        )
+
+        if self.main_window is not None:
+            if product_id is not None:
+                add_open_product_action(
+                    menu,
+                    self.main_window,
+                    product_id
+                )
+
+            if instance_id is not None:
+                add_open_instance_action(
+                    menu,
+                    self.main_window,
+                    instance_id
+                )
+            if instance_id is not None:
+                add_open_purchase_action(
+                    menu,
+                    self.main_window,
+                    instance_id
+                )
         delete_action = None
 
         if (
@@ -788,75 +821,30 @@ class SaleCard(QWidget):
                 and not self.sale_completed
             )
         ):
+            if not menu.isEmpty():
+                menu.addSeparator()
+
             delete_action = menu.addAction(
                 "Удалить из продажи"
             )
+
+        if menu.isEmpty():
+            return
 
         action = menu.exec(
             self.items_table.viewport().mapToGlobal(
                 position
             )
         )
-        if action == open_instance_action:
-            table_item = self.items_table.item(
-                row,
-                0
-            )
 
-            instance_id = None
-
-            if table_item is not None:
-                instance_id = table_item.data(
-                    Qt.UserRole
-                )
-
-            if (
-                instance_id is not None
-                and self.main_window is not None
-            ):
-                self.main_window.open_instance_card(
-                    int(instance_id)
-                )
-
-            return
-        if action == open_product_action:
-            product_id = None
-
-            values = self.existing_item_values.get(row)
-
-            if values is not None:
-                product_id = values.get("product_id")
-
-            if product_id is None:
-                table_item = self.items_table.item(
-                    row,
-                    0
-                )
-
-                if table_item is not None:
-                    product_id = table_item.data(
-                        Qt.UserRole + 1
-                    )
-
-            if (
-                product_id is not None
-                and self.main_window is not None
-            ):
-                self.main_window.open_product_card(
-                    int(product_id)
-                )
-
-            return
         if delete_action is not None and action == delete_action:
-            self.items_table.selectRow(
-                row
-            )
+            self.items_table.selectRow(row)
 
             if self.sale_id is not None:
                 self.remove_existing_item()
-
             else:
                 self.remove_selected_item()
+
     def remove_selected_item(self):
         row = self.items_table.currentRow()
 
