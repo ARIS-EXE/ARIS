@@ -258,6 +258,22 @@ class InstanceCard(QWidget):
 
         self.load_instance()
 
+    def get_form_state(self):
+        return (
+            self.condition.currentData(),
+            self.purchase_price.value(),
+            self.purchase_shipping.value(),
+            self.purchase_date.text(),
+            self.listed_date.text(),
+            self.notes.text(),
+        )
+
+    def has_unsaved_changes(self):
+        return (
+            self.get_form_state()
+            != getattr(self, "_saved_form_state", None)
+        )
+
     def load_instance(self):
         connection = get_connection()
 
@@ -377,6 +393,7 @@ class InstanceCard(QWidget):
             instance[8] or ""
         )
         self.load_history()
+        self._saved_form_state = self.get_form_state()
     def eventFilter(self, obj, event):
         if (
             obj is self.history_list
@@ -400,8 +417,20 @@ class InstanceCard(QWidget):
 
         return super().eventFilter(obj, event)
     def save_and_close(self):
-        if self.save():
-            self.close()
+        if not self.save():
+            return
+
+        window = self.window()
+
+        if hasattr(window, "tabs") and hasattr(window, "close_tab"):
+            index = window.tabs.indexOf(self)
+
+            if index >= 0:
+                window.close_tab(index)
+                return
+
+        self.close()
+
     def save(self):
         from database.database import get_connection
 
@@ -520,6 +549,7 @@ class InstanceCard(QWidget):
             "Сохранено",
             "Экземпляр успешно сохранён."
         )
+        return True
 
     def open_product_card(self):
         if self.product_id is None:
