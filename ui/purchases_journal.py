@@ -121,14 +121,23 @@ class PurchasesJournal(QWidget):
 
             total_cost = total_price + total_shipping
 
-            if total_profit > total_cost:
+            all_sold = (
+                len(items) > 0
+                and all(item[9] == "sold" for item in items)
+            )
+
+            if all_sold:
+                green = QBrush(QColor("#A8D5A2"))
+
+            elif total_profit > total_cost:
                 green = QBrush(QColor(220, 245, 220))
 
+            else:
+                green = None
+
+            if green is not None:
                 for column in range(self.tree.columnCount()):
-                    purchase_item.setBackground(
-                        column,
-                        green
-                    )
+                    purchase_item.setBackground(column, green)
 
             status_names = {
                 "in_stock": "На складе",

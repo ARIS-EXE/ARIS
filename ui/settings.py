@@ -4,8 +4,9 @@ from models.commission_formula import (
     VARIABLES,
 )
 import sqlite3
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import (
+    QComboBox,    
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -56,10 +57,15 @@ class SettingsDialog(QDialog):
         self.commission_formula_button = QPushButton(
             "Формула комиссии"
         )
+        self.new_products_button = QPushButton(
+            "Значения по умолчанию"
+        )
+
         for button in (
             self.delivery_button,
             self.backup_button,
             self.commission_formula_button,
+            self.new_products_button,
         ):
             button.setFixedWidth(190)
             button.setMinimumHeight(36)
@@ -298,10 +304,61 @@ class SettingsDialog(QDialog):
 
         formula_layout.addStretch()
 
+        # Страница настроек новых товаров
+        new_products_page = QWidget()
+        new_products_layout = QVBoxLayout(new_products_page)
+
+        new_products_title = QLabel("Значения для новых товаров")
+        new_products_title.setStyleSheet(
+            "font-size: 20px; font-weight: bold;"
+        )
+        new_products_layout.addWidget(new_products_title)
+
+        new_products_layout.addWidget(
+            QLabel(
+                "Значения, автоматически подставляемые "
+                "при создании нового товара."
+            )
+        )
+
+        delivery_default_label = QLabel(
+            "Доставка по умолчанию:"
+        )
+        new_products_layout.addWidget(delivery_default_label)
+
+        self.default_delivery_combo = QComboBox()
+        new_products_layout.addWidget(
+            self.default_delivery_combo
+        )
+
+        commission_default_label = QLabel(
+            "Комиссия по умолчанию:"
+        )
+        new_products_layout.addWidget(
+            commission_default_label
+        )
+
+        self.default_commission_combo = QComboBox()
+        self.default_commission_combo.addItem(
+            "Формула", "formula"
+        )
+        self.default_commission_combo.addItem(
+            "Фиксированная", "fixed"
+        )
+        self.default_commission_combo.addItem(
+            "Процент", "percent"
+        )
+        new_products_layout.addWidget(
+            self.default_commission_combo
+        )
+
+        new_products_layout.addStretch()
+
         # Добавляем страницы
         self.pages.addWidget(delivery_page)
         self.pages.addWidget(backup_page)
         self.pages.addWidget(formula_page)
+        self.pages.addWidget(new_products_page)
         self.delivery_button.clicked.connect(
             lambda: self.pages.setCurrentIndex(0)
         )
@@ -311,11 +368,90 @@ class SettingsDialog(QDialog):
         self.commission_formula_button.clicked.connect(
             lambda: self.pages.setCurrentIndex(2)
         )
+        self.new_products_button.clicked.connect(
+            lambda: self.pages.setCurrentIndex(3)
+        )
         main_layout.addLayout(navigation_layout)
         main_layout.addWidget(self.pages, 1)
 
         self.load_delivery_options()
         self.load_commission_formula()
+        self.load_new_product_defaults()
+
+        self.default_delivery_combo.currentIndexChanged.connect(
+            self.save_new_product_defaults
+        )
+        self.default_commission_combo.currentIndexChanged.connect(
+            self.save_new_product_defaults
+        )
+
+    def load_new_product_defaults(self):
+        settings = QSettings("ARIS", "ARIS")
+
+        saved_delivery = settings.value(
+            "new_product/default_delivery_id",
+            None
+        )
+
+        saved_commission = settings.value(
+            "new_product/default_commission_type",
+            "formula"
+        )
+
+        self.default_delivery_combo.clear()
+        self.default_delivery_combo.addItem(
+            "Не выбрана", None
+        )
+
+        with sqlite3.connect(DB_PATH) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, name
+                FROM delivery_options
+                ORDER BY name COLLATE NOCASE
+                """
+            ).fetchall()
+
+        for option_id, name in rows:
+            self.default_delivery_combo.addItem(
+                name, option_id
+            )
+
+        if saved_delivery is not None:
+            index = self.default_delivery_combo.findData(
+                int(saved_delivery)
+            )
+
+            if index >= 0:
+                self.default_delivery_combo.setCurrentIndex(
+                    index
+                )
+
+        index = self.default_commission_combo.findData(
+            saved_commission
+        )
+
+        if index >= 0:
+            self.default_commission_combo.setCurrentIndex(
+                index
+            )
+
+    def save_new_product_defaults(self, *_):
+        settings = QSettings("ARIS", "ARIS")
+
+        delivery_id = self.default_delivery_combo.currentData()
+        commission_type = self.default_commission_combo.currentData()
+
+        settings.setValue(
+            "new_product/default_delivery_id",
+            delivery_id
+        )
+
+        settings.setValue(
+            "new_product/default_commission_type",
+            commission_type
+        )
+
     def load_delivery_options(self):
         with sqlite3.connect(DB_PATH) as connection:
             rows = connection.execute(
@@ -419,7 +555,7 @@ class SettingsDialog(QDialog):
             return
 
         self.load_delivery_options()
-
+        self.load_new_product_defaults()
     def delete_delivery_option(self):
         row = self.delivery_table.currentRow()
 
@@ -468,7 +604,7 @@ class SettingsDialog(QDialog):
             return
 
         self.load_delivery_options()
-
+        self.load_new_product_defaults()
     def create_backup(self):
         self.main_window.create_backup()
 

@@ -267,7 +267,18 @@ def update_sale(
                 sale_id
             )
         )
-
+        connection.execute(
+            """
+            UPDATE events
+            SET event_date = ?
+            WHERE sale_id = ?
+              AND event_type = 'sale'
+            """,
+            (
+                sale_date,
+                sale_id
+            )
+        )
         connection.commit()
 
     except Exception:

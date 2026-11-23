@@ -75,7 +75,17 @@ class PurchaseCard(QWidget):
         self.total_count_layout.addWidget(
             self.total_count_value_label
         )
+        self.total_profit_text_label = QLabel("Прибыль:")
 
+        self.total_profit_value_label = QLabel("0")
+
+        self.total_profit_layout = QHBoxLayout()
+        self.total_profit_layout.addWidget(
+            self.total_profit_text_label
+        )
+        self.total_profit_layout.addWidget(
+            self.total_profit_value_label
+        )
         self.items_table = QTableWidget()
         self.items_table.setColumnCount(4)
 
@@ -113,11 +123,18 @@ class PurchaseCard(QWidget):
         )
 
         layout.addWidget(
-            self.items_table
+            self.items_table,
+            1
         )
-        layout.addLayout(
-            self.total_count_layout
-        )
+        totals_layout = QHBoxLayout()
+
+        totals_layout.addStretch()
+
+        totals_layout.addLayout(self.total_count_layout)
+        totals_layout.addSpacing(30)
+        totals_layout.addLayout(self.total_profit_layout)
+
+        layout.addLayout(totals_layout)
         # ============================================================
         # Основная рабочая область
         # ============================================================
@@ -390,7 +407,8 @@ class PurchaseCard(QWidget):
         # ============================================================
 
         layout.addLayout(
-            main_area
+            main_area,
+            0
         )
 
         # ============================================================
@@ -443,6 +461,7 @@ class PurchaseCard(QWidget):
         self.add_button.setEnabled(False)
         self.add_existing_instance_button.setEnabled(False)
         self.save_button.setEnabled(False)
+        self.save_close_button.setEnabled(False)
     def load_products(self):
         connection = get_connection()
 
@@ -882,6 +901,29 @@ class PurchaseCard(QWidget):
 
         self.total_count_value_label.setText(str(total))
 
+    def update_total_profit(self):
+        total_profit = 0
+
+        for row in range(self.items_table.rowCount()):
+            profit_item = self.items_table.item(row, 3)
+
+            if profit_item is None:
+                continue
+
+            value = profit_item.text().replace(",", "").strip()
+
+            if not value:
+                continue
+
+            try:
+                total_profit += float(value)
+            except ValueError:
+                continue
+
+        self.total_profit_value_label.setText(
+            f"{total_profit:,.0f}"
+        )
+
     def show_context_menu(self, position):
         item = self.items_table.itemAt(position)
 
@@ -948,7 +990,7 @@ class PurchaseCard(QWidget):
 
         delete_row_action = None
 
-        if not self.purchase_saved or self.purchase_id is not None:
+        if not self.read_only:
             menu.addSeparator()
 
             delete_row_action = menu.addAction(
@@ -1019,6 +1061,8 @@ class PurchaseCard(QWidget):
         )
 
         self.items_table.setRowCount(0)
+
+        self.total_profit_value_label.setText("0")
 
         purchase_items = get_purchase_items(purchase_id)
 
@@ -1120,6 +1164,7 @@ class PurchaseCard(QWidget):
 
                     if item_cell is not None:
                         item_cell.setBackground(yellow)
+        self.update_total_profit()
         self.purchase_saved = True
 
         self.product_search.clear()
@@ -1249,6 +1294,18 @@ class PurchaseCard(QWidget):
         self.purchase_id = purchase_id
 
         self.load_purchase(purchase_id)
+        self.read_only = True
+        self.set_read_only_mode()
+        window = self.window()
+
+        if hasattr(window, "tabs"):
+            index = window.tabs.indexOf(self)
+
+            if index >= 0:
+                window.tabs.setTabText(
+                    index,
+                    f"Закупка №{purchase_number}"
+                )
         self._purchase_save_success = True
         return
         self.product_list.clear()
@@ -1349,6 +1406,8 @@ class PurchaseCard(QWidget):
         )
 
         self.load_purchase(self.purchase_id)
+        self.read_only = True
+        self.set_read_only_mode()
         self._purchase_save_success = True
     def save_purchase_and_close(self):
         self.save_purchase()

@@ -12,10 +12,10 @@ from database.database import get_connection
 class CategorySelector(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        if not hasattr(parent, "_category_tree_state"):
-            parent._category_tree_state = {}
+        if not hasattr(CategorySelector, "_shared_tree_state"):
+            CategorySelector._shared_tree_state = {}
 
-        self.tree_state = parent._category_tree_state
+        self.tree_state = CategorySelector._shared_tree_state
 
         self.setWindowTitle("Выбор категории")
         self.resize(450, 500)
@@ -128,6 +128,6 @@ class CategorySelector(QDialog):
                 self.tree.topLevelItem(index)
             )
 
-    def closeEvent(self, event):
+    def done(self, result):
         self.save_expanded_state()
-        super().closeEvent(event)
+        super().done(result)

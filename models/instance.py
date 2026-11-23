@@ -342,6 +342,44 @@ def search_instances(search_text):
 
     finally:
         connection.close()
+
+def get_instance_for_sale(instance_id):
+    connection = get_connection()
+
+    try:
+        cursor = connection.execute(
+            """
+            SELECT
+                instances.id,
+                instances.product_id,
+                instances.internal_number,
+                products.manufacturer,
+                products.part_number,
+                products.name,
+                products.barcode,
+                instances.condition,
+                instances.purchase_price,
+                instances.purchase_shipping,
+                products.default_buyer_shipping,
+                products.default_packaging,
+                products.default_delivery_option_id,
+                products.default_commission_type,
+                products.default_commission_value
+            FROM instances
+            JOIN products
+                ON products.id = instances.product_id
+            WHERE instances.id = ?
+              AND instances.deleted = 0
+              AND instances.status = 'in_stock'
+            """,
+            (instance_id,)
+        )
+
+        return cursor.fetchone()
+
+    finally:
+        connection.close()
+
 def create_instances_batch(
     product_id,
     count,

@@ -1073,10 +1073,28 @@ class Inventory(QWidget):
                     int(instance_id)
                 )
             )
+            menu.addSeparator()
 
+            sell_action = menu.addAction("Продать")
+
+            sell_action.triggered.connect(
+                lambda: self.main_window.sell_instance(
+                    int(instance_id)
+                )
+            )
         elif product_id is not None:
             action = menu.addAction(
                 "Открыть карточку товара"
+            )
+
+            menu.addSeparator()
+
+            copy_action = menu.addAction("Создать копию")
+
+            copy_action.triggered.connect(
+                lambda: self.main_window.copy_product_card(
+                    int(product_id)
+                )
             )
 
             action.triggered.connect(

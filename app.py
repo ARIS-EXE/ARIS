@@ -209,10 +209,12 @@ class MainWindow(QMainWindow):
             allow_deleted=allow_deleted
         )
 
-        tab_title = product_tab.name.text().strip()
+        product_name = product_tab.name.text().strip()
 
-        if not tab_title:
-            tab_title = "Карточка товара"
+        if product_id is not None:
+            tab_title = product_name or "Карточка товара"
+        else:
+            tab_title = "Новый товар"
 
         tab_index = self.tabs.addTab(
             product_tab,
@@ -282,6 +284,23 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(
             tab_index
         )
+
+    def sell_instance(self, instance_id):
+        sale_tab = SaleCard(
+            main_window=self
+        )
+
+        if not sale_tab.add_instance_by_id(instance_id):
+            sale_tab.deleteLater()
+            return
+
+        tab_index = self.tabs.addTab(
+            sale_tab,
+            "Новая продажа"
+        )
+
+        self.tabs.setCurrentIndex(tab_index)
+
     def open_new_purchase(self):
         purchase_tab = PurchaseCard(self)
 
@@ -301,10 +320,21 @@ class MainWindow(QMainWindow):
             read_only=read_only
         )
 
+        from models.purchase import get_purchases
+
+        purchase_number = next(
+            (
+                item[1]
+                for item in get_purchases()
+                if item[0] == purchase_id
+            ),
+            None
+        )
+
         title = (
-            "Просмотр закупки"
-            if read_only
-            else "Редактирование закупки"
+            f"Закупка №{purchase_number}"
+            if purchase_number is not None
+            else f"Закупка ID {purchase_id}"
         )
 
         tab_index = self.tabs.addTab(
@@ -380,6 +410,45 @@ class MainWindow(QMainWindow):
         )
 
         self.tabs.setCurrentIndex(tab_index)
+
+    def copy_product_card(self, product_id):
+        source = ProductCard(product_id)
+        copy = ProductCard()
+
+        copy.manufacturer.setText(source.manufacturer.text())
+        copy.part_number.setText(source.part_number.text())
+        copy.name.setText(source.name.text())
+        copy.category_id = source.category_id
+        copy.category.setText(source.category.text())
+        copy.description.setPlainText(source.description.toPlainText())
+        copy.manufacturer_price.setValue(source.manufacturer_price.value())
+        copy.notes.setPlainText(source.notes.toPlainText())
+        copy.packaging.setValue(source.packaging.value())
+        copy.buyer_shipping.setValue(source.buyer_shipping.value())
+
+        delivery_index = copy.delivery_option.findData(
+            source.delivery_option.currentData()
+        )
+        if delivery_index >= 0:
+            copy.delivery_option.setCurrentIndex(delivery_index)
+
+        commission_index = copy.commission_type.findData(
+            source.commission_type.currentData()
+        )
+        if commission_index >= 0:
+            copy.commission_type.setCurrentIndex(commission_index)
+
+        copy.commission_value.setValue(
+            source.commission_value.value()
+        )
+
+        # Штрихкод и фотографию не копируем.
+        copy.barcode.clear()
+
+        index = self.tabs.addTab(copy, "Копия товара")
+        self.tabs.setCurrentIndex(index)
+
+        copy.destroyed.connect(self.refresh_inventory)
 
     def open_new_product(self):
         current_widget = self.tabs.currentWidget()
@@ -569,6 +638,13 @@ class MainWindow(QMainWindow):
         if isinstance(widget, InstanceCard):
             if not widget.has_unsaved_changes():
                 widget.load_instance()
+
+        elif isinstance(widget, ProductCard):
+            if widget.product_id is not None:
+                if not widget.has_unsaved_changes():
+                    widget.load_product()
+
+                widget.load_instances()
 
         elif isinstance(widget, Inventory):
             widget.restore_expanded_state()

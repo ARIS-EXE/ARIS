@@ -164,6 +164,11 @@ class SaleCard(QWidget):
             "Завершить и закрыть"
         )
 
+        if self.edit_mode:
+            self.complete_close_button.setText(
+                "Сохранить и закрыть"
+            )
+
         buttons_layout = QHBoxLayout()
 
         buttons_layout.addWidget(
@@ -657,6 +662,38 @@ class SaleCard(QWidget):
 
         dialog.exec()
 
+    def add_instance_by_id(self, instance_id):
+        from models.instance import get_instance_for_sale
+
+        result = get_instance_for_sale(instance_id)
+
+        if result is None:
+            QMessageBox.warning(
+                self,
+                "Экземпляр недоступен",
+                "Экземпляр не найден или уже выбыл со склада."
+            )
+            return False
+
+        self.select_instance(
+            result[0],
+            result[1],
+            result[2],
+            result[3],
+            result[4],
+            result[5],
+            result[6],
+            result[8],
+            result[9],
+            result[10],
+            result[11],
+            result[12],
+            result[13],
+            result[14]
+        )
+
+        return True
+
     def search_instances(
         self,
         search_text,
@@ -916,7 +953,7 @@ class SaleCard(QWidget):
         default_delivery_option_id,
         default_commission_type,
         default_commission_value,
-        dialog
+        dialog=None
     ):
         if hasattr(
             self,
@@ -1305,7 +1342,8 @@ class SaleCard(QWidget):
 
         self.update_totals()
 
-        dialog.accept()
+        if dialog is not None:
+            dialog.accept()
     def update_existing_item_profit(
         self,
         row
@@ -1788,6 +1826,10 @@ class SaleCard(QWidget):
             self._sale_save_success = True
 
             self.complete_button.setEnabled(
+                False
+            )
+
+            self.complete_close_button.setEnabled(
                 False
             )
 

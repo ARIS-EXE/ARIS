@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPixmap, QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -67,22 +67,6 @@ class ProductCard(QWidget):
         self.resize(750, 750)
 
         main_layout = QVBoxLayout(self)
-
-        # =========================================================
-        # Заголовок
-        # =========================================================
-
-        title = QLabel(
-            "Новый товар"
-            if product_id is None
-            else "Карточка товара"
-        )
-
-        title.setStyleSheet(
-            "font-size: 22px; font-weight: bold;"
-        )
-
-        main_layout.addWidget(title)
 
         # =========================================================
         # Верхняя часть: данные + изображение
@@ -520,6 +504,8 @@ class ProductCard(QWidget):
 
         self.update_commission_suffix()
 
+        if self.product_id is None:
+            self.apply_new_product_defaults()
 
         if self.product_id is not None:
             self.load_product()
@@ -618,10 +604,20 @@ class ProductCard(QWidget):
     # =============================================================
 
     def load_image(self):
+        settings = QSettings("ARIS", "ARIS")
+
+        last_folder = settings.value(
+            "images/last_folder",
+            str(Path.home())
+        )
+
+        if not Path(last_folder).is_dir():
+            last_folder = str(Path.home())
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Выберите изображение",
-            "",
+            last_folder,
             "Изображения (*.jpg *.jpeg *.png *.webp)"
         )
 
@@ -667,7 +663,10 @@ class ProductCard(QWidget):
                 "Выбранный файл не удалось открыть как изображение."
             )
             return
-
+        settings.setValue(
+            "images/last_folder",
+            str(source.parent)
+        )
         if self.product_id is None:
             # Товар ещё не сохранён.
             # Пока запоминаем исходный файл.
@@ -1376,7 +1375,68 @@ class ProductCard(QWidget):
     # =============================================================
     # Загрузка товара
     # =============================================================
+    def get_form_state(self):
+        return (
+            self.barcode.text(),
+            self.manufacturer.text(),
+            self.part_number.text(),
+            self.name.text(),
+            self.category_id,
+            self.description.toPlainText(),
+            self.manufacturer_price.value(),
+            self.notes.toPlainText(),
+            self.packaging.value(),
+            self.buyer_shipping.value(),
+            self.delivery_option.currentData(),
+            self.commission_type.currentData(),
+            self.commission_value.value(),
+            self.image_filename,
+            self.pending_image_path,
+        )
 
+    def has_unsaved_changes(self):
+        return (
+            self.get_form_state()
+            != getattr(self, "_saved_form_state", None)
+        )
+    def apply_new_product_defaults(self):
+        if self.product_id is not None:
+            return
+
+        settings = QSettings("ARIS", "ARIS")
+
+        delivery_id = settings.value(
+            "new_product/default_delivery_id",
+            None
+        )
+
+        commission_type = settings.value(
+            "new_product/default_commission_type",
+            "formula"
+        )
+
+        if delivery_id not in (None, "", "None"):
+            try:
+                delivery_id = int(delivery_id)
+            except (TypeError, ValueError):
+                delivery_id = None
+
+            if delivery_id is not None:
+                index = self.delivery_option.findData(
+                    delivery_id
+                )
+
+                if index >= 0:
+                    self.delivery_option.setCurrentIndex(index)
+
+        index = self.commission_type.findData(
+            commission_type
+        )
+
+        if index >= 0:
+            self.commission_type.setCurrentIndex(index)
+
+        self.update_commission_suffix()
     def load_product(self):
         if self.allow_deleted:
             deleted_condition = ""
@@ -1520,7 +1580,7 @@ class ProductCard(QWidget):
         self.load_image_preview()
 
         self.update_image_buttons()
-
+        self._saved_form_state = self.get_form_state()
     def load_delivery_options(self):
         connection = get_connection()
         cursor = connection.cursor()
@@ -1709,11 +1769,6 @@ class ProductCard(QWidget):
                 self.product_id_label.setText(
                     str(self.product_id)
                 )
-                self.product_id = cursor.lastrowid
-
-                self.product_id_label.setText(
-                    str(self.product_id)
-                )
 
                 connection.commit()
                 # Если изображение было выбрано
@@ -1805,7 +1860,17 @@ class ProductCard(QWidget):
                         )
 
             connection.commit()
+            self._saved_form_state = self.get_form_state()
+            window = self.window()
 
+            if hasattr(window, "tabs"):
+                index = window.tabs.indexOf(self)
+
+                if index >= 0:
+                    window.tabs.setTabText(
+                        index,
+                        name
+                    )
             QMessageBox.information(
                 self,
                 "Сохранено",

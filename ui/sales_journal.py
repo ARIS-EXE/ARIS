@@ -255,7 +255,11 @@ class SalesJournal(QWidget):
                     f"№{sale_item[2]}",
                     sale_item[3] or "",
                     str(sale_item[6]),
-                    sale_item[5] or "",
+                    (
+                        f"{sale_item[4] or ''} — {sale_item[5] or ''}"
+                        if sale_item[4]
+                        else sale_item[5] or ""
+                    ),
                     "Экземпляр",
                     status
                 ])
